@@ -1,0 +1,48 @@
+{
+  "name": "heightmap-generator",
+  "version": "0.1.0",
+  "description": "Procedural heightmap generator for MMO/PvP games with Unreal Engine integration",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
+  },
+  "keywords": [
+    "heightmap",
+    "terrain",
+    "procedural",
+    "unreal-engine",
+    "game-development"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.1.2",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "astar-typescript": "^1.2.5",
+    "fastnoisejs": "^2.0.0",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.33.2",
+    "simplex-noise": "^4.0.1"
+  }
+}
+
