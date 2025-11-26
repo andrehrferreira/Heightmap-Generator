@@ -113,6 +113,24 @@ interface CellFlags {
 }
 ```
 
+#### Example Usage
+
+```typescript
+import { createCell, createCellFlags } from './core/cell.js';
+
+// Create a new cell
+const cell = createCell(1, 270);
+
+// Modify flags
+cell.flags.road = true;
+cell.flags.water = false;
+cell.flags.boundary = true;
+cell.flags.boundaryType = 'edge';
+
+// Set road identifier
+cell.roadId = 42;
+```
+
 ### Grid Dimensions
 
 ```typescript
@@ -123,6 +141,34 @@ rows = mapSize.height / cellSize
 Where:
 - `mapSize`: Total map dimensions (e.g., 1024x1024 Unreal units)
 - `cellSize`: Size of each cell (e.g., 1-4 Unreal units)
+
+#### Example Usage
+
+```typescript
+import { Grid } from './core/grid.js';
+
+// Create a grid
+const grid = new Grid({
+  width: 1024,
+  height: 1024,
+  cellSize: 1,
+});
+
+// Access cells
+const cell = grid.getCell(100, 200);
+console.log(`Level: ${cell.levelId}, Height: ${cell.height}`);
+
+// Modify cells
+grid.setLevelId(100, 200, 1);
+grid.setHeight(100, 200, 270);
+
+// Iterate over all cells
+grid.forEachCell((cell, x, y) => {
+  if (cell.flags.road) {
+    console.log(`Road at (${x}, ${y})`);
+  }
+});
+```
 
 ## Level System
 
@@ -172,6 +218,32 @@ function validateHeightDifference(levelA: number, levelB: number): boolean {
   
   return difference <= MAX_HEIGHT_DIFFERENCE;
 }
+```
+
+#### Example Usage
+
+```typescript
+import {
+  calculateBaseHeight,
+  validateHeightDifference,
+  isUnderwaterLevel,
+  isMountainPeakLevel,
+  DEFAULT_CHARACTER_HEIGHT,
+  MAX_HEIGHT_DIFFERENCE,
+} from './core/level.js';
+
+// Calculate base heights
+const height0 = calculateBaseHeight(0);  // 0
+const height1 = calculateBaseHeight(1);  // 270
+const heightNeg1 = calculateBaseHeight(-1); // -270
+
+// Validate transitions
+const isValid = validateHeightDifference(0, 1);  // true (270 units)
+const isInvalid = validateHeightDifference(0, 2);  // false (540 > 270)
+
+// Check level types
+const isUnderwater = isUnderwaterLevel(-1);  // true
+const isPeak = isMountainPeakLevel(3, 2);    // true (above walkable)
 ```
 
 ### Level Distribution

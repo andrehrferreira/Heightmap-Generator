@@ -44,23 +44,45 @@ npm run build
 
 ## Documentation
 
+### Core Systems
 - [Architecture](docs/ARCHITECTURE.md) - System architecture and mental model
 - [Generation Pipeline](docs/GENERATION_PIPELINE.md) - 4-phase generation process
 - [Layer System](docs/LAYER_SYSTEM.md) - Photoshop-like layer system for terrain features
 - [Multi-Map System](docs/MULTI_MAP_SYSTEM.md) - Multi-zone world management
 - [Slope System](docs/SLOPE_SYSTEM.md) - Progressive slope system for level transitions
-- [Underwater & Mountains](docs/UNDERWATER_AND_MOUNTAINS.md) - Underwater gameplay and mountain peaks above walkable level
-- [Persistence](docs/PERSISTENCE.md) - Project save/load and localStorage auto-save
-- [Albion Inspiration](docs/ALBION_INSPIRATION.md) - Insights from Albion Online's map design process
-- [ARK Inspiration](docs/ARK_INSPIRATION.md) - Insights from ARK: Survival Evolved's procedural generation
-- [API Reference](docs/API.md) - Web interface API documentation
-- [AI Assistant](docs/AI_ASSISTANT.md) - AI-powered map editing with DeepSeek Chat integration
-- [Preview Navigation](docs/PREVIEW_NAVIGATION.md) - Camera controls and navigation for map preview
+
+### Terrain Generation
+- [Noise System](docs/NOISE_SYSTEM.md) - Advanced noise algorithms and layering
+- [Terrain Filters](docs/TERRAIN_FILTERS.md) - Post-processing filters (erosion, blur, terrace)
+- [Procedural Masks](docs/PROCEDURAL_MASKS.md) - Automatic mask generation from terrain analysis
+- [Spline Features](docs/SPLINE_FEATURES.md) - Spline-based roads, rivers, and ridges
+
+### Tools & Editing
+- [Sculpting Tools](docs/SCULPTING_TOOLS.md) - Real-time terrain sculpting brushes
+- [Stamp Library](docs/STAMP_LIBRARY.md) - Reusable terrain stamps and scatter placement
+- [Heightmap Import](docs/HEIGHTMAP_IMPORT.md) - Import and blend external heightmaps
+
+### Features
+- [Underwater & Mountains](docs/UNDERWATER_AND_MOUNTAINS.md) - Underwater gameplay and mountain peaks
+- [Boundaries & Blocking](docs/BOUNDARIES_AND_BLOCKING.md) - Boundary system and blocking zones
+- [Navigation & Collision](docs/NAVIGATION_AND_COLLISION.md) - Navigation maps and collision generation
+
+### Export & Integration
 - [Export Format](docs/EXPORT_FORMAT.md) - Export format specifications
-- [Navigation & Collision](docs/NAVIGATION_AND_COLLISION.md) - Navigation maps and collision generation for Unreal Engine
-- [Boundaries & Blocking](docs/BOUNDARIES_AND_BLOCKING.md) - Boundary system and blocking zones (edge, interior, ocean)
+- [Multi-Resolution Export](docs/MULTI_RESOLUTION_EXPORT.md) - Multiple resolutions and tiled export
 - [Unreal Engine Workflow](docs/UNREAL_WORKFLOW.md) - Complete integration workflow for Unreal Engine
+
+### Interface & Tools
+- [Preview Navigation](docs/PREVIEW_NAVIGATION.md) - Camera controls and navigation for map preview
+- [AI Assistant](docs/AI_ASSISTANT.md) - AI-powered map editing with DeepSeek Chat integration
+- [Persistence](docs/PERSISTENCE.md) - Project save/load and localStorage auto-save
+- [API Reference](docs/API.md) - Web interface API documentation
+
+### Reference
 - [Technical Stack](docs/TECHNICAL_STACK.md) - Technology choices and project structure
+- [Albion Inspiration](docs/ALBION_INSPIRATION.md) - Insights from Albion Online's map design
+- [ARK Inspiration](docs/ARK_INSPIRATION.md) - Insights from ARK's procedural generation
+- [Dependencies Update](docs/DEPENDENCIES_UPDATE.md) - Dependencies review and update log
 
 ## Project Status
 
