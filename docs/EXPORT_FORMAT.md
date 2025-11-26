@@ -1,5 +1,30 @@
 # Export Format Specification
 
+## Resolution Standards
+
+### Recommended Resolutions
+
+| Resolution | Dimensions | Use Case | File Size (16-bit) |
+|------------|------------|----------|-------------------|
+| **2K** | 2048×2048 | Small maps, testing | ~8 MB |
+| **4K** | 4096×4096 | Standard maps (default) | ~32 MB |
+| **8K** | 8192×8192 | Large detailed maps | ~128 MB |
+| **16K** | 16384×16384 | Massive open worlds | ~512 MB |
+
+### Default Export Resolution
+
+- **Preview**: 512×512 to 2048×2048 (for real-time visualization)
+- **Export**: **4096×4096 (4K)** - Recommended default for production
+- **High Detail**: **8192×8192 (8K)** - For detailed terrain features
+
+### Unreal Engine Landscape Size Mapping
+
+| Resolution | Unreal Components | Sections per Component |
+|------------|-------------------|------------------------|
+| 2048×2048 | 4×4 | 2×2 |
+| 4096×4096 | 8×8 | 2×2 |
+| 8192×8192 | 16×16 | 2×2 |
+
 ## Heightmap Format
 
 ### File Format

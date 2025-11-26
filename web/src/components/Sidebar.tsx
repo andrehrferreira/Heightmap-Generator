@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid3X3, Mountain, PlayCircle } from 'lucide-react';
+import { Grid3X3, Mountain, PlayCircle, Monitor } from 'lucide-react';
 import { useGenerator } from '../context/GeneratorContext';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
@@ -45,8 +45,45 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({ icon, title, children }) 
   </div>
 );
 
+// Resolution presets
+const RESOLUTION_PRESETS = [
+  { label: '512', value: 512, desc: 'Preview' },
+  { label: '1K', value: 1024, desc: 'Low' },
+  { label: '2K', value: 2048, desc: 'Medium' },
+  { label: '4K', value: 4096, desc: 'Standard' },
+  { label: '8K', value: 8192, desc: 'High' },
+];
+
+interface ResolutionButtonProps {
+  preset: typeof RESOLUTION_PRESETS[0];
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+const ResolutionButton: React.FC<ResolutionButtonProps> = ({ preset, isSelected, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center py-1.5 px-2 rounded-md text-xs transition-colors ${
+      isSelected 
+        ? 'bg-primary text-primary-foreground' 
+        : 'bg-secondary hover:bg-secondary/80 text-muted-foreground'
+    }`}
+  >
+    <span className="font-semibold">{preset.label}</span>
+    <span className="text-[10px] opacity-70">{preset.desc}</span>
+  </button>
+);
+
 export const Sidebar: React.FC = () => {
   const { config, setConfig, generate, isGenerating } = useGenerator();
+
+  const handleResolutionPreset = (value: number) => {
+    setConfig({ width: value, height: value });
+  };
+
+  const currentResolutionPreset = RESOLUTION_PRESETS.find(
+    p => p.value === config.width && p.value === config.height
+  );
 
   return (
     <aside className="flex flex-col w-[280px] bg-card border-r border-border shrink-0">
@@ -56,21 +93,37 @@ export const Sidebar: React.FC = () => {
         </span>
       </div>
       <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+        <ConfigSection icon={<Monitor className="w-4 h-4" />} title="Resolution">
+          <div className="grid grid-cols-5 gap-1 mb-3">
+            {RESOLUTION_PRESETS.map(preset => (
+              <ResolutionButton
+                key={preset.value}
+                preset={preset}
+                isSelected={currentResolutionPreset?.value === preset.value}
+                onClick={() => handleResolutionPreset(preset.value)}
+              />
+            ))}
+          </div>
+          <div className="text-[10px] text-muted-foreground text-center mb-2">
+            {config.width}×{config.height} = {((config.width * config.height) / 1000000).toFixed(2)}M pixels
+          </div>
+        </ConfigSection>
+
         <ConfigSection icon={<Grid3X3 className="w-4 h-4" />} title="Grid Settings">
           <ConfigSlider
             label="Width"
             value={config.width}
-            min={128}
-            max={2048}
-            step={128}
+            min={256}
+            max={8192}
+            step={256}
             onChange={(v) => setConfig({ width: v })}
           />
           <ConfigSlider
             label="Height"
             value={config.height}
-            min={128}
-            max={2048}
-            step={128}
+            min={256}
+            max={8192}
+            step={256}
             onChange={(v) => setConfig({ height: v })}
           />
           <ConfigSlider
@@ -118,6 +171,12 @@ export const Sidebar: React.FC = () => {
           <PlayCircle className="w-4 h-4" />
           {isGenerating ? 'Generating...' : 'Generate Heightmap'}
         </Button>
+        
+        <div className="mt-3 p-2 bg-secondary/50 rounded-md">
+          <p className="text-[10px] text-muted-foreground">
+            <strong>Note:</strong> 4K/8K resolutions are for export. Preview uses downsampled version for performance.
+          </p>
+        </div>
       </div>
     </aside>
   );
