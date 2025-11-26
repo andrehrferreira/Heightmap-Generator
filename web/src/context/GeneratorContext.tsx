@@ -41,8 +41,10 @@ interface GeneratorContextType {
   status: { message: string; type: StatusType };
   setStatus: (message: string, type?: StatusType) => void;
   isGenerating: boolean;
+  isRestored: boolean;
   generate: () => Promise<void>;
   onGenerate: (callback: (cols: number, rows: number) => void) => void;
+  onRestore: (callback: () => void) => void;
 }
 
 const defaultConfig: GenerationConfig = {
@@ -55,6 +57,7 @@ const defaultConfig: GenerationConfig = {
 };
 
 const STORAGE_KEY = 'heightmap-generator-state';
+const LAYERS_KEY = 'heightmap-generator-layers';
 
 interface SavedState {
   config: GenerationConfig;
@@ -66,17 +69,7 @@ interface SavedState {
     cells: Array<{
       levelId: number;
       height: number;
-      flags: {
-        road: boolean;
-        ramp: boolean;
-        water: boolean;
-        cliff: boolean;
-        playable: boolean;
-        underwater: boolean;
-        visualOnly: boolean;
-        blocked: boolean;
-        boundary: boolean;
-      };
+      flags: Record<string, boolean>;
     }>;
   };
   roadNetwork?: {
@@ -103,7 +96,10 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [status, setStatusState] = useState({ message: 'Ready', type: 'success' as StatusType });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
+  const [isRestored, setIsRestored] = useState(false);
+  
   const onGenerateCallbackRef = useRef<((cols: number, rows: number) => void) | null>(null);
+  const onRestoreCallbackRef = useRef<(() => void) | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
 
   // Save state to localStorage (debounced)
@@ -119,7 +115,6 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
           viewMode,
         };
 
-        // Serialize grid data if available
         if (result?.grid) {
           const grid = result.grid;
           const cells: Array<{
@@ -155,7 +150,6 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
           state.heightStats = result.heightStats;
         }
 
-        // Serialize road network
         if (result?.roadNetwork) {
           state.roadNetwork = {
             pois: result.roadNetwork.pois?.map((p: any) => ({
@@ -174,7 +168,7 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
       } catch (error) {
         console.warn('[Persistence] Failed to save:', error);
       }
-    }, 500); // Debounce 500ms
+    }, 500);
   }, [config, result, viewMode]);
 
   // Restore state from localStorage
@@ -188,7 +182,7 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       const state: SavedState = JSON.parse(saved);
       
-      // Restore config
+      // Restore config and viewMode
       setConfigState(state.config);
       setViewModeState(state.viewMode);
 
@@ -203,9 +197,8 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
         });
 
         // Restore cell data
-        const cols = grid.getCols();
         let index = 0;
-        grid.forEachCell((cell: any, x: number, y: number) => {
+        grid.forEachCell((cell: any) => {
           const saved = state.gridData!.cells[index];
           if (saved) {
             cell.levelId = saved.levelId;
@@ -215,7 +208,7 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
           index++;
         });
 
-        // Restore result
+        // Set result
         setResultState({
           grid,
           roadNetwork: state.roadNetwork ? {
@@ -236,11 +229,26 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
           onGenerateCallbackRef.current(grid.getCols(), grid.getRows());
         }
 
+        // Restore layers from separate storage
+        const savedLayers = localStorage.getItem(LAYERS_KEY);
+        if (savedLayers && onRestoreCallbackRef.current) {
+          // Will be handled by LayerContext
+        }
+
         setStatusState({ message: 'Session restored', type: 'success' });
         console.log('[Persistence] State restored');
       }
 
       setIsRestoring(false);
+      setIsRestored(true);
+      
+      // Call restore callback after a tick to ensure React has updated
+      setTimeout(() => {
+        if (onRestoreCallbackRef.current) {
+          onRestoreCallbackRef.current();
+        }
+      }, 100);
+      
       return true;
     } catch (error) {
       console.error('[Persistence] Failed to restore:', error);
@@ -254,7 +262,7 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
     restoreState();
   }, [restoreState]);
 
-  // Save on state changes
+  // Save on state changes (but not during restore)
   useEffect(() => {
     if (!isRestoring) {
       saveState();
@@ -267,7 +275,6 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-      // Synchronous save
       try {
         const state: SavedState = { config, viewMode };
         if (result?.grid) {
@@ -340,8 +347,13 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
     onGenerateCallbackRef.current = callback;
   }, []);
 
+  const onRestore = useCallback((callback: () => void) => {
+    onRestoreCallbackRef.current = callback;
+  }, []);
+
   const generate = useCallback(async () => {
     setIsGenerating(true);
+    setIsRestored(false); // This is a new generation, not a restore
     
     try {
       const { Grid } = await import('../../../src/core/grid.js');
@@ -418,8 +430,10 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
       status,
       setStatus,
       isGenerating,
+      isRestored,
       generate,
       onGenerate,
+      onRestore,
     }}>
       {children}
     </GeneratorContext.Provider>

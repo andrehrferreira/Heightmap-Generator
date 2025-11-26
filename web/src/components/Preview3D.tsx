@@ -6,9 +6,17 @@ import { useGenerator } from '../context/GeneratorContext';
 // Maximum segments for real-time preview (balance quality vs performance)
 const MAX_PREVIEW_SEGMENTS = 256; // Higher = better quality but slower
 
+// Camera state storage key
+const CAMERA_KEY = 'heightmap-generator-camera';
+
+interface CameraState {
+  position: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+}
+
 export const Preview3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { result } = useGenerator();
+  const { result, isRestored } = useGenerator();
   const [isInitialized, setIsInitialized] = useState(false);
   
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -18,6 +26,44 @@ export const Preview3D: React.FC = () => {
   const terrainRef = useRef<THREE.Mesh | null>(null);
   const poisRef = useRef<THREE.Mesh[]>([]);
   const animationRef = useRef<number>(0);
+  const hasSetInitialCamera = useRef<boolean>(false);
+  const cameraUpdateTimeoutRef = useRef<number | null>(null);
+
+  // Save camera state
+  const saveCameraState = () => {
+    if (cameraRef.current && controlsRef.current) {
+      const state: CameraState = {
+        position: {
+          x: cameraRef.current.position.x,
+          y: cameraRef.current.position.y,
+          z: cameraRef.current.position.z,
+        },
+        target: {
+          x: controlsRef.current.target.x,
+          y: controlsRef.current.target.y,
+          z: controlsRef.current.target.z,
+        },
+      };
+      localStorage.setItem(CAMERA_KEY, JSON.stringify(state));
+    }
+  };
+
+  // Restore camera state
+  const restoreCameraState = (): boolean => {
+    try {
+      const saved = localStorage.getItem(CAMERA_KEY);
+      if (saved && cameraRef.current && controlsRef.current) {
+        const state: CameraState = JSON.parse(saved);
+        cameraRef.current.position.set(state.position.x, state.position.y, state.position.z);
+        controlsRef.current.target.set(state.target.x, state.target.y, state.target.z);
+        controlsRef.current.update();
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to restore camera state');
+    }
+    return false;
+  };
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -56,6 +102,14 @@ export const Preview3D: React.FC = () => {
     controls.maxPolarAngle = Math.PI / 2.1;
     controls.target.set(0, 0, 0);
     controlsRef.current = controls;
+
+    // Save camera on control changes (debounced)
+    controls.addEventListener('change', () => {
+      if (cameraUpdateTimeoutRef.current) {
+        clearTimeout(cameraUpdateTimeoutRef.current);
+      }
+      cameraUpdateTimeoutRef.current = window.setTimeout(saveCameraState, 300);
+    });
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -264,13 +318,27 @@ export const Preview3D: React.FC = () => {
       console.log(`Added ${result.roadNetwork.pois.length} POIs`);
     }
 
-    // Update camera
+    // Update camera only for new generations, not restores
     if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(terrainSize, heightScale + 50, terrainSize);
-      controlsRef.current.target.set(0, heightScale / 2, 0);
+      // Try to restore camera state if this is a restore
+      if (isRestored && !hasSetInitialCamera.current) {
+        const restored = restoreCameraState();
+        if (!restored) {
+          // No saved state, set default position
+          cameraRef.current.position.set(terrainSize, heightScale + 50, terrainSize);
+          controlsRef.current.target.set(0, heightScale / 2, 0);
+        }
+        hasSetInitialCamera.current = true;
+      } else if (!isRestored && !hasSetInitialCamera.current) {
+        // New generation - set camera to view the terrain
+        cameraRef.current.position.set(terrainSize, heightScale + 50, terrainSize);
+        controlsRef.current.target.set(0, heightScale / 2, 0);
+        hasSetInitialCamera.current = true;
+      }
+      // Don't reset camera for subsequent updates
       controlsRef.current.update();
     }
-  }, [result, isInitialized]);
+  }, [result, isInitialized, isRestored]);
 
   // Resolution info
   const getResolutionInfo = () => {
