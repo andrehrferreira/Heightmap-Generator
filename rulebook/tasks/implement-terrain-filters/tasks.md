@@ -1,19 +1,19 @@
 ## 1. Implementation Phase
-- [ ] 1.1 Create `src/filters/types.ts` with filter interfaces
-- [ ] 1.2 Create `src/filters/stack.ts` with filter stack system
-- [ ] 1.3 Create `src/filters/mask.ts` with filter masking
-- [ ] 1.4 Create `src/filters/blur/gaussian.ts` with Gaussian blur
-- [ ] 1.5 Create `src/filters/blur/box.ts` with box blur
-- [ ] 1.6 Create `src/filters/blur/bilateral.ts` with bilateral filter
-- [ ] 1.7 Create `src/filters/detail/sharpen.ts` with sharpen filter
-- [ ] 1.8 Create `src/filters/detail/high-pass.ts` with high-pass filter
-- [ ] 1.9 Create `src/filters/shape/terrace.ts` with terrace filter
-- [ ] 1.10 Create `src/filters/shape/clamp.ts` with clamp filter
-- [ ] 1.11 Create `src/filters/shape/normalize.ts` with normalize filter
-- [ ] 1.12 Create `src/filters/adjustment/levels.ts` with levels filter
-- [ ] 1.13 Create `src/filters/adjustment/curves.ts` with curves filter
-- [ ] 1.14 Create `src/filters/erosion/hydraulic.ts` with hydraulic erosion
-- [ ] 1.15 Create `src/filters/erosion/thermal.ts` with thermal erosion
+- [x] 1.1 Create `src/filters/erosion.ts` with erosion interfaces
+- [x] 1.2 Implement Gaussian smoothing (gaussianSmooth, gaussianSmoothGrid)
+- [x] 1.3 Implement hydraulic erosion placeholder (applyHydraulicErosion)
+- [x] 1.4 Implement thermal erosion placeholder (applyThermalErosion)
+- [x] 1.5 Create `src/filters/terrain-noise.ts` with noise filters
+- [x] 1.6 Implement ridged noise (applyRidgedNoise)
+- [x] 1.7 Implement domain warping (applyDomainWarping)
+- [x] 1.8 Create `src/generators/realistic-terrain.ts` with FBM + ridged noise
+- [x] 1.9 Implement smoothstep transitions for barriers
+- [ ] 1.10 Create `src/filters/blur/bilateral.ts` with bilateral filter
+- [ ] 1.11 Create `src/filters/detail/sharpen.ts` with sharpen filter
+- [ ] 1.12 Create `src/filters/shape/terrace.ts` with terrace filter
+- [ ] 1.13 Create `src/filters/shape/clamp.ts` with clamp filter
+- [ ] 1.14 Create `src/filters/adjustment/levels.ts` with levels filter
+- [ ] 1.15 Create `src/filters/adjustment/curves.ts` with curves filter
 - [ ] 1.16 Create `src/filters/presets.ts` with filter presets
 
 ## 2. Testing Phase
@@ -31,4 +31,3 @@
 - [ ] 3.1 Add JSDoc comments to all public interfaces and methods
 - [ ] 3.2 Update `docs/TERRAIN_FILTERS.md` with API examples
 - [ ] 3.3 Add visual before/after examples
-

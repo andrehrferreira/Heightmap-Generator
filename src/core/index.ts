@@ -10,4 +10,6 @@ export * from './slope.js';
 export * from './layer.js';
 export * from './layer-stack.js';
 export * from './stamp.js';
+export * from './biome.js';
+export * from './advanced-ramps.js';
 

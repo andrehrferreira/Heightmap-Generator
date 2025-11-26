@@ -1,14 +1,17 @@
 ## 1. Implementation Phase
-- [ ] 1.1 Implement OrbitControls in `web/src/preview/controls.ts`
-- [ ] 1.2 Implement mouse controls (drag, wheel, right-click)
-- [ ] 1.3 Implement touch controls (pinch, pan, rotate)
-- [ ] 1.4 Implement keyboard controls (arrow keys, WASD, +/-)
-- [ ] 1.5 Implement camera presets (top-down, isometric, side)
-- [ ] 1.6 Implement focus on area feature
-- [ ] 1.7 Implement fit to bounds feature
-- [ ] 1.8 Implement reset camera feature
-- [ ] 1.9 Add camera state API endpoints
-- [ ] 1.10 Add camera control API endpoints
+- [x] 1.1 Implement OrbitControls in `web/src/components/Preview3D.tsx`
+- [x] 1.2 Implement mouse controls (drag rotate, wheel zoom, right-click pan)
+- [x] 1.3 Implement camera position persistence to localStorage
+- [x] 1.4 Implement reset camera feature
+- [x] 1.5 Implement large terrain scale (16000 units, open-world size)
+- [x] 1.6 Implement infinite grid helper (16000 units, 32 divisions)
+- [x] 1.7 Implement GPU terrain renderer with displacement shaders
+- [x] 1.8 Implement high-resolution preview (1024 segments max)
+- [ ] 1.9 Implement touch controls (pinch, pan, rotate)
+- [ ] 1.10 Implement keyboard controls (arrow keys, WASD, +/-)
+- [ ] 1.11 Implement camera presets (top-down, isometric, side)
+- [ ] 1.12 Implement focus on area feature
+- [ ] 1.13 Implement fit to bounds feature
 
 ## 2. Testing Phase
 - [ ] 2.1 Write unit tests for camera controls

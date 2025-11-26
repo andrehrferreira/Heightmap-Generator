@@ -1,10 +1,15 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useGenerator } from '../context/GeneratorContext';
+import { StandardTerrainRenderer } from '../lib/gpu/GPUTerrainRenderer';
 
-// Maximum segments for real-time preview (balance quality vs performance)
-const MAX_PREVIEW_SEGMENTS = 256; // Higher = better quality but slower
+// WebGPU is still experimental in Three.js - use WebGL for now
+// WebGPU support can be added when Three.js stabilizes the API
+const WEBGPU_ENABLED = false; // Set to true when WebGPU is ready
+
+// Maximum segments for real-time preview - higher = more detail
+const MAX_PREVIEW_SEGMENTS = 1024; // High resolution for detailed terrain
 
 // Camera state storage key
 const CAMERA_KEY = 'heightmap-generator-camera';
@@ -16,21 +21,24 @@ interface CameraState {
 
 export const Preview3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { result, isRestored } = useGenerator();
+  const { result, isRestored, setStatus, config } = useGenerator();
   const [isInitialized, setIsInitialized] = useState(false);
-  
+  const [renderStats, setRenderStats] = useState<{ fps: number; triangles: number } | null>(null);
+
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const terrainRef = useRef<THREE.Mesh | null>(null);
+  const terrainRendererRef = useRef<StandardTerrainRenderer | null>(null);
   const poisRef = useRef<THREE.Mesh[]>([]);
   const animationRef = useRef<number>(0);
-  const hasSetInitialCamera = useRef<boolean>(false);
   const cameraUpdateTimeoutRef = useRef<number | null>(null);
+  const fpsCounterRef = useRef<{ frames: number; lastTime: number }>({ frames: 0, lastTime: 0 });
+  const lastFrameTimeRef = useRef<number>(0);
+  const maxFPSRef = useRef<number>(30);
 
   // Save camera state
-  const saveCameraState = () => {
+  const saveCameraState = useCallback(() => {
     if (cameraRef.current && controlsRef.current) {
       const state: CameraState = {
         position: {
@@ -46,10 +54,10 @@ export const Preview3D: React.FC = () => {
       };
       localStorage.setItem(CAMERA_KEY, JSON.stringify(state));
     }
-  };
+  }, []);
 
   // Restore camera state
-  const restoreCameraState = (): boolean => {
+  const restoreCameraState = useCallback((): boolean => {
     try {
       const saved = localStorage.getItem(CAMERA_KEY);
       if (saved && cameraRef.current && controlsRef.current) {
@@ -63,13 +71,13 @@ export const Preview3D: React.FC = () => {
       console.warn('Failed to restore camera state');
     }
     return false;
-  };
+  }, []);
 
   // Initialize Three.js scene
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log('Initializing Three.js scene...');
+    console.time('[WebGL] Scene initialization');
 
     const container = containerRef.current;
     const width = container.clientWidth || 800;
@@ -80,27 +88,33 @@ export const Preview3D: React.FC = () => {
     scene.background = new THREE.Color(0x1a1a1a);
     sceneRef.current = scene;
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 10000);
-    camera.position.set(200, 150, 200);
+    // Camera - positioned for epic open world view
+    const camera = new THREE.PerspectiveCamera(60, width / height, 50, 500000);
+    camera.position.set(12000, 8000, 12000);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // WebGL Renderer with optimizations
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance',
+      stencil: false,
+    });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.info.autoReset = false;
+    
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Controls
+    // Controls - adjusted for epic open world
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 20;
-    controls.maxDistance = 1000;
+    controls.minDistance = 500;
+    controls.maxDistance = 60000;
     controls.maxPolarAngle = Math.PI / 2.1;
-    controls.target.set(0, 0, 0);
+    controls.target.set(0, 200, 0);
     controlsRef.current = controls;
 
     // Save camera on control changes (debounced)
@@ -111,21 +125,36 @@ export const Preview3D: React.FC = () => {
       cameraUpdateTimeoutRef.current = window.setTimeout(saveCameraState, 300);
     });
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Lighting - enhanced for epic terrain
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(100, 200, 100);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    directionalLight.position.set(5000, 10000, 5000);
     scene.add(directionalLight);
 
-    // Grid helper for debugging
-    const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x333333);
+    // Secondary light for better shadows
+    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+    fillLight.position.set(-3000, 5000, -3000);
+    scene.add(fillLight);
+
+    // Infinite grid using GridHelper with massive size
+    const gridHelper = new THREE.GridHelper(50000, 200, 0x333333, 0x222222);
+    gridHelper.position.y = -5; // Slightly below terrain base
     scene.add(gridHelper);
+
+    // Create terrain renderer with massive open world scale
+    // terrainSize: size in world units (like meters)
+    // heightScale: vertical exaggeration for dramatic terrain
+    terrainRendererRef.current = new StandardTerrainRenderer({
+      terrainSize: 16000,  // 16km x 16km terrain - massive open world
+      segments: MAX_PREVIEW_SEGMENTS,
+      heightScale: 800,    // Dramatic height for epic mountains
+    });
 
     // Handle resize
     const handleResize = () => {
-      if (!containerRef.current || !camera || !renderer) return;
+      if (!containerRef.current) return;
       const newWidth = containerRef.current.clientWidth;
       const newHeight = containerRef.current.clientHeight;
       if (newWidth > 0 && newHeight > 0) {
@@ -134,45 +163,71 @@ export const Preview3D: React.FC = () => {
         renderer.setSize(newWidth, newHeight);
       }
     };
-    
+
     window.addEventListener('resize', handleResize);
-    
-    // Use ResizeObserver for container resize
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
-    // Animation loop
-    const animate = () => {
+    // Animation loop with FPS counter and FPS limit
+    const animate = (currentTime: number) => {
       animationRef.current = requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
+      
+      // FPS limiting: calculate minimum time between frames
+      const maxFPS = maxFPSRef.current || 30;
+      const minFrameTime = 1000 / maxFPS; // milliseconds per frame
+      const elapsed = currentTime - lastFrameTimeRef.current;
+      
+      if (elapsed >= minFrameTime) {
+        lastFrameTimeRef.current = currentTime - (elapsed % minFrameTime);
+        
+        controls.update();
+        renderer.info.reset();
+        renderer.render(scene, camera);
+
+        // Update FPS counter
+        fpsCounterRef.current.frames++;
+        if (currentTime - fpsCounterRef.current.lastTime >= 1000) {
+          setRenderStats({
+            fps: fpsCounterRef.current.frames,
+            triangles: renderer.info.render.triangles,
+          });
+          fpsCounterRef.current.frames = 0;
+          fpsCounterRef.current.lastTime = currentTime;
+        }
+      }
     };
-    animate();
+    
+    animate(performance.now());
+
+    console.timeEnd('[WebGL] Scene initialization');
 
     setIsInitialized(true);
-    console.log('Three.js scene initialized');
 
     return () => {
-      console.log('Cleaning up Three.js scene');
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
       cancelAnimationFrame(animationRef.current);
       controls.dispose();
       renderer.dispose();
+      terrainRendererRef.current?.dispose();
       if (container && renderer.domElement) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [saveCameraState]);
+
+  // Update maxFPS ref when config changes
+  useEffect(() => {
+    maxFPSRef.current = config.maxFPS || 30;
+  }, [config.maxFPS]);
 
   // Update terrain when result changes
   useEffect(() => {
-    if (!result || !sceneRef.current || !isInitialized) {
-      console.log('Skipping terrain update:', { hasResult: !!result, hasScene: !!sceneRef.current, isInitialized });
+    if (!result || !sceneRef.current || !isInitialized || !terrainRendererRef.current) {
       return;
     }
 
-    console.log('Updating terrain with result:', result);
+    console.time('[WebGL] Terrain update');
 
     const scene = sceneRef.current;
     const grid = result.grid;
@@ -182,14 +237,13 @@ export const Preview3D: React.FC = () => {
       return;
     }
 
-    // Cleanup old terrain
-    if (terrainRef.current) {
-      scene.remove(terrainRef.current);
-      terrainRef.current.geometry.dispose();
-      (terrainRef.current.material as THREE.Material).dispose();
-      terrainRef.current = null;
+    // Remove old terrain mesh
+    const oldMesh = terrainRendererRef.current.getMesh();
+    if (oldMesh && oldMesh.parent) {
+      scene.remove(oldMesh);
     }
 
+    // Remove old POIs
     poisRef.current.forEach((mesh) => {
       scene.remove(mesh);
       mesh.geometry.dispose();
@@ -197,148 +251,76 @@ export const Preview3D: React.FC = () => {
     });
     poisRef.current = [];
 
+    // Get height stats
+    const heightStats = result.heightStats || { minHeight: 0, maxHeight: 100 };
+
+    // Create new terrain using optimized renderer
+    const terrainMesh = terrainRendererRef.current.createFromGrid(grid, heightStats);
+    scene.add(terrainMesh);
+
     const gridWidth = grid.getCols();
     const gridHeight = grid.getRows();
-    
-    console.log(`Grid dimensions: ${gridWidth}×${gridHeight}`);
+    const terrainSize = 16000;   // Epic open world (16km)
+    const heightScale = 800;     // Epic height for mountains
 
-    // Calculate segments (limit for performance)
-    const segmentsX = Math.min(gridWidth - 1, MAX_PREVIEW_SEGMENTS - 1);
-    const segmentsY = Math.min(gridHeight - 1, MAX_PREVIEW_SEGMENTS - 1);
-    
-    // Terrain size in 3D space
-    const terrainSize = 150;
-    
-    // Create geometry
-    const geometry = new THREE.PlaneGeometry(terrainSize, terrainSize, segmentsX, segmentsY);
-    geometry.rotateX(-Math.PI / 2);
-    
-    const positions = geometry.attributes.position.array as Float32Array;
-    const vertexCount = (segmentsX + 1) * (segmentsY + 1);
-    const colors = new Float32Array(vertexCount * 3);
-
-    // Find height range
-    let minH = Infinity, maxH = -Infinity;
-    for (let j = 0; j <= segmentsY; j++) {
-      for (let i = 0; i <= segmentsX; i++) {
-        const gx = Math.min(Math.floor((i / segmentsX) * (gridWidth - 1)), gridWidth - 1);
-        const gy = Math.min(Math.floor((j / segmentsY) * (gridHeight - 1)), gridHeight - 1);
-        const cell = grid.getCell(gx, gy);
-        if (cell && typeof cell.height === 'number') {
-          if (cell.height < minH) minH = cell.height;
-          if (cell.height > maxH) maxH = cell.height;
-        }
-      }
-    }
-    
-    console.log(`Height range: ${minH} - ${maxH}`);
-    
-    const heightRange = maxH - minH || 1;
-    // Scale height proportionally to terrain size for natural look
-    const heightScale = terrainSize * 0.25; // 25% of terrain width as max height
-
-    // Level colors
-    const levelColors = [
-      [0.25, 0.73, 0.31], // Green - Level 0
-      [0.35, 0.65, 1.0],  // Blue - Level 1
-      [0.64, 0.44, 0.97], // Purple - Level 2
-      [0.97, 0.32, 0.29], // Red - Level 3+
-    ];
-
-    // Apply heights and colors
-    for (let j = 0; j <= segmentsY; j++) {
-      for (let i = 0; i <= segmentsX; i++) {
-        const vertexIndex = j * (segmentsX + 1) + i;
-        
-        const gx = Math.min(Math.floor((i / segmentsX) * (gridWidth - 1)), gridWidth - 1);
-        const gy = Math.min(Math.floor((j / segmentsY) * (gridHeight - 1)), gridHeight - 1);
-        const cell = grid.getCell(gx, gy);
-        
-        if (!cell) continue;
-        
-        // Set height (Y position)
-        const normalizedHeight = (cell.height - minH) / heightRange;
-        const y = normalizedHeight * heightScale;
-        positions[vertexIndex * 3 + 1] = y;
-        
-        // Set color
-        let r: number, g: number, b: number;
-        
-        if (cell.flags && cell.flags.road) {
-          r = 0.85; g = 0.6; b = 0.15;
-        } else if (cell.flags && cell.flags.water) {
-          r = 0.2; g = 0.6; b = 0.9;
-        } else {
-          const colorIdx = Math.min(Math.max(0, cell.levelId || 0), levelColors.length - 1);
-          [r, g, b] = levelColors[colorIdx];
-        }
-        
-        colors[vertexIndex * 3] = r;
-        colors[vertexIndex * 3 + 1] = g;
-        colors[vertexIndex * 3 + 2] = b;
-      }
-    }
-
-    // Update geometry
-    geometry.attributes.position.needsUpdate = true;
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
-
-    // Material
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-    });
-
-    // Create mesh
-    const terrain = new THREE.Mesh(geometry, material);
-    terrain.position.set(0, 0, 0);
-    scene.add(terrain);
-    terrainRef.current = terrain;
-
-    console.log('Terrain mesh created and added to scene');
-
-    // Add POIs
+    // Add POIs - scaled for epic open world
     if (result.roadNetwork?.pois && Array.isArray(result.roadNetwork.pois)) {
-      const poiGeometry = new THREE.SphereGeometry(2, 16, 16);
-      const poiMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+      const poiGeometry = new THREE.SphereGeometry(150, 16, 16); // Epic POI markers for visibility
+      const poiMaterial = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.9 });
+
+      const heightRange = heightStats.maxHeight - heightStats.minHeight || 1;
 
       for (const poi of result.roadNetwork.pois) {
+        // Validate POI coordinates are within grid bounds
+        if (poi.x < 0 || poi.x >= gridWidth || poi.y < 0 || poi.y >= gridHeight) {
+          console.warn(`POI (${poi.x}, ${poi.y}) out of bounds, skipping`);
+          continue;
+        }
+
         const poiMesh = new THREE.Mesh(poiGeometry, poiMaterial);
-        
+
         const px = (poi.x / gridWidth - 0.5) * terrainSize;
         const pz = (poi.y / gridHeight - 0.5) * terrainSize;
         const cell = grid.getCell(poi.x, poi.y);
-        const py = cell ? ((cell.height - minH) / heightRange) * heightScale + 3 : 3;
-        
+        const py = cell
+          ? ((cell.height - heightStats.minHeight) / heightRange) * heightScale + 200
+          : 200;
+
         poiMesh.position.set(px, py, pz);
         scene.add(poiMesh);
         poisRef.current.push(poiMesh);
       }
-      console.log(`Added ${result.roadNetwork.pois.length} POIs`);
     }
 
-    // Update camera only for new generations, not restores
-    if (cameraRef.current && controlsRef.current) {
-      // Try to restore camera state if this is a restore
-      if (isRestored && !hasSetInitialCamera.current) {
-        const restored = restoreCameraState();
-        if (!restored) {
-          // No saved state, set default position
-          cameraRef.current.position.set(terrainSize, heightScale + 50, terrainSize);
-          controlsRef.current.target.set(0, heightScale / 2, 0);
-        }
-        hasSetInitialCamera.current = true;
-      } else if (!isRestored && !hasSetInitialCamera.current) {
-        // New generation - set camera to view the terrain
-        cameraRef.current.position.set(terrainSize, heightScale + 50, terrainSize);
-        controlsRef.current.target.set(0, heightScale / 2, 0);
-        hasSetInitialCamera.current = true;
-      }
-      // Don't reset camera for subsequent updates
+    // Update controls
+    if (controlsRef.current) {
       controlsRef.current.update();
     }
-  }, [result, isInitialized, isRestored]);
+
+    console.timeEnd('[WebGL] Terrain update');
+    setStatus(`Rendered ${grid.getCols()}×${grid.getRows()} terrain`, 'success');
+  }, [result, isInitialized, setStatus]);
+
+  // Dedicated effect for camera state restoration
+  useEffect(() => {
+    if (!cameraRef.current || !controlsRef.current || !isInitialized) {
+      return;
+    }
+
+    // Try to restore camera from localStorage
+    const restored = restoreCameraState();
+    
+    if (!restored) {
+      // Set default camera position only if no saved state
+      console.log('[Camera] No saved state, using defaults');
+      cameraRef.current.position.set(12000, 6000, 12000);
+      controlsRef.current.target.set(0, 200, 0);
+    } else {
+      console.log('[Camera] Restored from localStorage');
+    }
+    
+    controlsRef.current.update();
+  }, [isInitialized, restoreCameraState]);
 
   // Resolution info
   const getResolutionInfo = () => {
@@ -360,21 +342,26 @@ export const Preview3D: React.FC = () => {
           <div className="text-sm text-muted-foreground">Click "Generate Heightmap" to create terrain</div>
         </div>
       )}
-      
+
       {resInfo && (
         <div className="absolute top-4 right-4 px-3 py-2 bg-card/90 rounded-md text-xs z-10">
           <div className="text-muted-foreground">
             Source: <span className="text-foreground font-mono">{resInfo.w}×{resInfo.h}</span>
           </div>
           {resInfo.isDownsampled && (
-            <div className="text-warning mt-1">
+            <div className="text-yellow-500 mt-1">
               Preview: {Math.ceil(resInfo.w / resInfo.factor)}×{Math.ceil(resInfo.h / resInfo.factor)}
               <span className="text-muted-foreground ml-1">({resInfo.factor}× downsample)</span>
             </div>
           )}
+          {renderStats && (
+            <div className="text-green-500 mt-1">
+              {renderStats.fps} FPS • {(renderStats.triangles / 1000).toFixed(1)}k tris
+            </div>
+          )}
         </div>
       )}
-      
+
       <div className="absolute bottom-4 left-4 px-3 py-2 bg-card/90 rounded-md text-xs text-muted-foreground z-10">
         <kbd className="px-1.5 py-0.5 bg-secondary rounded text-[10px] font-mono mx-0.5">LMB</kbd> Rotate
         <kbd className="px-1.5 py-0.5 bg-secondary rounded text-[10px] font-mono mx-0.5 ml-2">RMB</kbd> Pan

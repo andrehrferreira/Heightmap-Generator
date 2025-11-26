@@ -67,7 +67,44 @@ body {
   border-top-color: #1a1a1a;
 }
 
-/* Scrollbar */
+/* Global Scrollbar Styles - Dark Theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-muted) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 0;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-muted);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-accent);
+  border: 1px solid transparent;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-border);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Thin Scrollbar Variant */
 .scrollbar-thin {
   scrollbar-width: thin;
 }
@@ -84,10 +121,12 @@ body {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background-color: var(--color-muted);
   border-radius: 4px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-border);
+  background-color: var(--color-accent);
 }
 
 /* Animation */

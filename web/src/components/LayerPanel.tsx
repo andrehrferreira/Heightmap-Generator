@@ -198,6 +198,13 @@ export const LayerPanel: React.FC = () => {
   const selectedLayer = layers.find(l => l.id === selectedLayerId);
   const selectedIndex = layers.findIndex(l => l.id === selectedLayerId);
 
+  // Debug: log layers count
+  React.useEffect(() => {
+    if (layers.length > 0) {
+      console.log('[LayerPanel] Layers count:', layers.length, 'IDs:', layers.map(l => l.id));
+    }
+  }, [layers]);
+
   const handleAddLayer = (type: LayerType) => {
     const names: Record<LayerType, string> = {
       base: 'Base',

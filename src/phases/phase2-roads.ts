@@ -4,15 +4,15 @@
  */
 
 import { Grid } from '../core/grid.js';
-import { validateHeightDifference, calculateBaseHeight } from '../core/level.js';
+import { calculateBaseHeight } from '../core/level.js';
 import {
   interpolateRampHeight,
   SlopeConfig,
   DEFAULT_SLOPE_CONFIG,
-  calculateMinRampLength,
+  // calculateMinRampLength, // unused
 } from '../core/slope.js';
 import { POINode, createPOI, POIType } from '../algorithms/poi.js';
-import { generateMSTRoadGraph, addExtraEdgesForLoops, createGraphFromPOIs, GraphEdge } from '../algorithms/mst.js';
+import { generateMSTRoadGraph, addExtraEdgesForLoops, createGraphFromPOIs } from '../algorithms/mst.js';
 import { findPath, AStarConfig, DEFAULT_ASTAR_CONFIG } from '../algorithms/astar-grid.js';
 import { simplifyPath, Point } from '../algorithms/douglas-peucker.js';
 

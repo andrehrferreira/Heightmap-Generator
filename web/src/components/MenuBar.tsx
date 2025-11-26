@@ -99,7 +99,7 @@ export const MenuBar: React.FC = () => {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const { saveProject, loadProject } = useProject();
   const { exportHeightmapPNG, exportLayersPNG, exportMetadata } = useExport();
-  const { generate, viewMode, setViewMode } = useGenerator();
+  const { generate, isGenerating, viewMode, setViewMode } = useGenerator();
 
   const menus: Menu[] = [
     {
@@ -108,6 +108,8 @@ export const MenuBar: React.FC = () => {
         { label: 'New Project', shortcut: 'Ctrl+N', onClick: () => window.location.reload() },
         { label: 'Open Project...', shortcut: 'Ctrl+O', onClick: loadProject },
         { label: 'Save Project', shortcut: 'Ctrl+S', onClick: saveProject },
+        { separator: true },
+        { label: 'Generate Heightmap', shortcut: 'F5', onClick: generate, disabled: isGenerating },
         { separator: true },
         { label: 'Export Heightmap PNG', onClick: exportHeightmapPNG },
         { label: 'Export Layers PNG', onClick: exportLayersPNG },
@@ -147,15 +149,6 @@ export const MenuBar: React.FC = () => {
         { label: 'Reset Camera', shortcut: 'R', disabled: true },
         { label: 'Zoom In', shortcut: 'Ctrl++', disabled: true },
         { label: 'Zoom Out', shortcut: 'Ctrl+-', disabled: true },
-      ],
-    },
-    {
-      label: 'Generate',
-      items: [
-        { label: 'Generate Heightmap', shortcut: 'F5', onClick: generate },
-        { separator: true },
-        { label: 'Regenerate with Same Seed', disabled: true },
-        { label: 'Generate Random Seed', disabled: true },
       ],
     },
     {

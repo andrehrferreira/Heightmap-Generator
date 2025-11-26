@@ -1,16 +1,19 @@
 ## 1. Implementation Phase
-- [ ] 1.1 Create `src/stamps/types.ts` with stamp interfaces
-- [ ] 1.2 Create `src/stamps/stamp.ts` with stamp class
-- [ ] 1.3 Create `src/stamps/library.ts` with library management
-- [ ] 1.4 Create `src/stamps/placement.ts` with placement system
-- [ ] 1.5 Create `src/stamps/scatter.ts` with scatter placement
-- [ ] 1.6 Create `src/stamps/blend.ts` with blend modes
-- [ ] 1.7 Create `src/stamps/procedural.ts` with procedural stamp generation
-- [ ] 1.8 Create `src/stamps/import-export.ts` with file I/O
-- [ ] 1.9 Create `src/stamps/builtin/` with built-in stamps
-- [ ] 1.10 Implement stamp from selection feature
-- [ ] 1.11 Implement stamp from file import
-- [ ] 1.12 Integrate with grid application
+- [x] 1.1 Create `src/core/stamp.ts` with stamp interfaces (StampDefinition, StampInstance)
+- [x] 1.2 Create StampLibrary class with library management
+- [x] 1.3 Implement built-in stamps (Mountain, Valley, Plateau, Lake, Crater, Ridge, etc.)
+- [x] 1.4 Create `web/src/lib/stampLoader.ts` with PNG stamp loading
+- [x] 1.5 Implement stamp thumbnail generation (`scripts/generate-thumbnails.js`)
+- [x] 1.6 Create manifest.json for stamp metadata
+- [x] 1.7 Implement blend modes (Add, Subtract, Replace, Max)
+- [x] 1.8 Implement stamp falloff types (Linear, Smooth, Exponential)
+- [x] 1.9 Create `web/src/components/StampPanel.tsx` with UI
+- [x] 1.10 Implement lazy loading of stamp height data
+- [x] 1.11 Implement stamp from file import (PNG)
+- [x] 1.12 Integrate with grid application (applyStampToGrid, applyLoadedStampToGrid)
+- [ ] 1.13 Add stamp preview overlay on terrain
+- [ ] 1.14 Implement scatter placement
+- [ ] 1.15 Implement stamp from selection feature
 
 ## 2. Testing Phase
 - [ ] 2.1 Write unit tests for stamp class
@@ -27,4 +30,3 @@
 - [ ] 3.1 Add JSDoc comments to all public interfaces and methods
 - [ ] 3.2 Update `docs/STAMP_LIBRARY.md` with API examples
 - [ ] 3.3 Add visual catalog of built-in stamps
-

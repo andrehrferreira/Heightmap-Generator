@@ -5,7 +5,9 @@
 
 import { Grid } from '../core/grid.js';
 import { calculateBaseHeight, MAX_HEIGHT_DIFFERENCE } from '../core/level.js';
-import { interpolateRampHeight, SlopeConfig, DEFAULT_SLOPE_CONFIG } from '../core/slope.js';
+import { SlopeConfig, DEFAULT_SLOPE_CONFIG } from '../core/slope.js';
+import { applyErosionToGrid, ErosionConfig } from '../filters/erosion.js';
+import { applyAdvancedRamps, AdvancedRampConfig, DEFAULT_ADVANCED_RAMP_CONFIG } from '../core/advanced-ramps.js';
 
 /**
  * Heightmap generation configuration.
@@ -29,6 +31,12 @@ export interface HeightmapConfig {
   levelBlendRadius: number;
   /** Height variation within same level (default: 20) */
   intraLevelVariation: number;
+  /** Enable erosion simulation for realistic terrain */
+  enableErosion: boolean;
+  /** Erosion configuration */
+  erosionConfig: Partial<ErosionConfig>;
+  /** Advanced ramp configuration */
+  advancedRampConfig: AdvancedRampConfig;
 }
 
 /**
@@ -43,6 +51,14 @@ export const DEFAULT_HEIGHTMAP_CONFIG: HeightmapConfig = {
   levelSmoothingIterations: 8,
   levelBlendRadius: 4,
   intraLevelVariation: 20,
+  enableErosion: true,
+  erosionConfig: {
+    hydraulicIterations: 30,
+    thermalIterations: 15,
+    smoothingIterations: 3,
+    smoothingRadius: 2,
+  },
+  advancedRampConfig: DEFAULT_ADVANCED_RAMP_CONFIG,
 };
 
 /**
@@ -451,28 +467,60 @@ export function executePhase3(
   grid: Grid,
   config: HeightmapConfig = DEFAULT_HEIGHTMAP_CONFIG
 ): Phase3Result {
-  // Step 1: Apply base heights from levels
-  applyBaseHeights(grid);
+  console.time('[Phase3] Total');
 
-  // Step 2: Smooth transitions between different levels (key for harmonious terrain!)
+  // Step 1: Apply base heights from levels
+  console.time('[Phase3] Base heights');
+  applyBaseHeights(grid);
+  console.timeEnd('[Phase3] Base heights');
+
+  // Step 2: Smooth transitions between different levels
+  console.time('[Phase3] Level transitions');
   smoothLevelTransitions(grid, config);
+  console.timeEnd('[Phase3] Level transitions');
+
+  // Step 2.5: Apply advanced ramps with noise and inaccessible areas
+  if (config.advancedRampConfig.enabled) {
+    console.time('[Phase3] Advanced ramps');
+    applyAdvancedRamps(grid, config.advancedRampConfig);
+    console.timeEnd('[Phase3] Advanced ramps');
+  }
 
   // Step 3: Add intra-level variation for natural terrain
+  console.time('[Phase3] Intra-level variation');
   addIntraLevelVariation(grid, config);
+  console.timeEnd('[Phase3] Intra-level variation');
 
   // Step 4: Apply biome noise for fine detail
+  console.time('[Phase3] Biome noise');
   applyBiomeNoise(grid, config);
+  console.timeEnd('[Phase3] Biome noise');
 
-  // Step 5: Smooth roads
+  // Step 5: Apply erosion for realistic terrain
+  if (config.enableErosion) {
+    console.time('[Phase3] Erosion');
+    applyErosionToGrid(grid, config.erosionConfig);
+    console.timeEnd('[Phase3] Erosion');
+  }
+
+  // Step 6: Smooth roads
+  console.time('[Phase3] Road smoothing');
   smoothRoads(grid, config);
+  console.timeEnd('[Phase3] Road smoothing');
 
-  // Step 6: Final smoothing pass
+  // Step 7: Final smoothing pass
+  console.time('[Phase3] Final smoothing');
   finalSmoothing(grid, 3);
+  console.timeEnd('[Phase3] Final smoothing');
 
-  // Step 7: Detect cliffs
+  // Step 8: Detect cliffs
+  console.time('[Phase3] Cliff detection');
   detectCliffs(grid);
+  console.timeEnd('[Phase3] Cliff detection');
 
-  // Step 8: Calculate statistics
+  console.timeEnd('[Phase3] Total');
+
+  // Step 9: Calculate statistics
   let minHeight = Infinity;
   let maxHeight = -Infinity;
   let sumHeight = 0;

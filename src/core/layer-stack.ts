@@ -271,7 +271,7 @@ export class LayerStack {
     }
 
     grid.forEachCell((cell, x, y) => {
-      const flags = cell.flags as Record<string, boolean>;
+      const flags = cell.flags as unknown as Record<string, boolean>;
       if (flags[flagName]) {
         layer.data!.mask[y * this.width + x] = 255;
       }
