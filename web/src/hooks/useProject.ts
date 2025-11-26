@@ -1,102 +1,88 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { useGenerator, GenerationConfig } from '../context/GeneratorContext';
 import { useLayerContext } from '../context/LayerContext';
 
 /**
- * Project file structure.
+ * Project file structure for export/import.
  */
 export interface ProjectFile {
   version: string;
-  config: GenerationConfig;
   timestamp: string;
+  config: GenerationConfig;
   gridData?: {
     width: number;
     height: number;
-    heights: number[];
-    levels: number[];
-    flags: Array<{
-      road: boolean;
-      ramp: boolean;
-      water: boolean;
-      cliff: boolean;
-      playable: boolean;
+    cellSize: number;
+    cells: Array<{
+      levelId: number;
+      height: number;
+      flags: Record<string, boolean>;
     }>;
   };
-  pois?: Array<{
-    id: string;
-    x: number;
-    y: number;
-    levelId: number;
-    type: string;
-  }>;
+  roadNetwork?: {
+    pois: Array<{ id: string; x: number; y: number; levelId: number; type: string }>;
+    totalRoadCells: number;
+  };
   layers?: object;
 }
 
 const PROJECT_VERSION = '0.1.0';
-const LOCALSTORAGE_KEY = 'heightmap-generator-project';
-const LOCALSTORAGE_LAYERS_KEY = 'heightmap-generator-layers';
-const AUTOSAVE_INTERVAL = 30000; // 30 seconds
 
 /**
- * Hook for project save/load functionality with auto-save.
+ * Hook for project save/load functionality.
+ * Note: Auto-save is handled by GeneratorContext.
  */
 export function useProject() {
   const { config, result, setConfig, setStatus } = useGenerator();
-  const { layerStack, exportLayers, importLayers } = useLayerContext();
-  const autoSaveIntervalRef = useRef<number | null>(null);
-  const lastSaveRef = useRef<number>(0);
+  const { exportLayers, importLayers, initializeStack } = useLayerContext();
 
   /**
-   * Saves project to a JSON file.
+   * Saves project to a JSON file download.
    */
   const saveProject = useCallback(() => {
     try {
       const project: ProjectFile = {
         version: PROJECT_VERSION,
-        config,
         timestamp: new Date().toISOString(),
+        config,
       };
 
       // Add grid data if available
       if (result?.grid) {
         const grid = result.grid;
-        const heights: number[] = [];
-        const levels: number[] = [];
-        const flags: ProjectFile['gridData']!['flags'] = [];
+        const cells: ProjectFile['gridData']!['cells'] = [];
 
         grid.forEachCell((cell: any) => {
-          heights.push(cell.height);
-          levels.push(cell.levelId);
-          flags.push({
-            road: cell.flags.road,
-            ramp: cell.flags.ramp,
-            water: cell.flags.water,
-            cliff: cell.flags.cliff,
-            playable: cell.flags.playable,
+          cells.push({
+            levelId: cell.levelId,
+            height: cell.height,
+            flags: { ...cell.flags },
           });
         });
 
         project.gridData = {
-          width: grid.getCols(),
-          height: grid.getRows(),
-          heights,
-          levels,
-          flags,
+          width: grid.getConfig().width,
+          height: grid.getConfig().height,
+          cellSize: grid.getConfig().cellSize,
+          cells,
         };
       }
 
-      // Add POIs if available
-      if (result?.roadNetwork?.pois) {
-        project.pois = result.roadNetwork.pois.map((poi: any) => ({
-          id: poi.id,
-          x: poi.x,
-          y: poi.y,
-          levelId: poi.levelId,
-          type: poi.type,
-        }));
+      // Add road network
+      if (result?.roadNetwork) {
+        project.roadNetwork = {
+          pois: result.roadNetwork.pois?.map((p: any) => ({
+            id: p.id,
+            x: p.x,
+            y: p.y,
+            levelId: p.levelId,
+            type: p.type,
+          })) || [],
+          totalRoadCells: result.roadNetwork.totalRoadCells || 0,
+        };
       }
 
-      // Add layers if available
+      // Add layers
       const layersData = exportLayers();
       if (layersData) {
         project.layers = layersData;
@@ -113,7 +99,7 @@ export function useProject() {
       a.click();
       URL.revokeObjectURL(url);
 
-      setStatus('Project saved successfully', 'success');
+      setStatus('Project saved to file', 'success');
     } catch (error) {
       console.error('Save error:', error);
       setStatus('Failed to save project', 'error');
@@ -135,7 +121,6 @@ export function useProject() {
         const text = await file.text();
         const project: ProjectFile = JSON.parse(text);
 
-        // Validate version
         if (!project.version) {
           throw new Error('Invalid project file');
         }
@@ -146,126 +131,38 @@ export function useProject() {
         // Import layers if available
         if (project.layers) {
           importLayers(project.layers);
+        } else if (project.gridData) {
+          // Initialize layer stack with grid dimensions
+          const cols = Math.floor(project.gridData.width / project.gridData.cellSize);
+          const rows = Math.floor(project.gridData.height / project.gridData.cellSize);
+          initializeStack(cols, rows);
         }
 
-        setStatus('Project loaded - click Generate to apply', 'success');
+        setStatus('Project loaded - click Generate to rebuild terrain', 'success');
       } catch (error) {
         console.error('Load error:', error);
-        setStatus('Failed to load project', 'error');
+        setStatus('Failed to load project file', 'error');
       }
     };
     input.click();
-  }, [setConfig, importLayers, setStatus]);
+  }, [setConfig, importLayers, initializeStack, setStatus]);
 
   /**
-   * Auto-saves to localStorage.
-   */
-  const autoSave = useCallback(() => {
-    const now = Date.now();
-    
-    // Debounce - don't save more than once per second
-    if (now - lastSaveRef.current < 1000) return;
-    lastSaveRef.current = now;
-
-    try {
-      // Save config
-      const project: ProjectFile = {
-        version: PROJECT_VERSION,
-        config,
-        timestamp: new Date().toISOString(),
-      };
-      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(project));
-
-      // Save layers separately (can be large)
-      const layersData = exportLayers();
-      if (layersData) {
-        localStorage.setItem(LOCALSTORAGE_LAYERS_KEY, JSON.stringify(layersData));
-      }
-
-      console.log('[AutoSave] Saved to localStorage');
-    } catch (error) {
-      // localStorage might be full or unavailable
-      console.warn('Auto-save error:', error);
-    }
-  }, [config, exportLayers]);
-
-  /**
-   * Restores from localStorage.
-   */
-  const autoRestore = useCallback(() => {
-    try {
-      const saved = localStorage.getItem(LOCALSTORAGE_KEY);
-      if (saved) {
-        const project: ProjectFile = JSON.parse(saved);
-        setConfig(project.config);
-
-        // Restore layers if available
-        const savedLayers = localStorage.getItem(LOCALSTORAGE_LAYERS_KEY);
-        if (savedLayers) {
-          importLayers(JSON.parse(savedLayers));
-        }
-
-        return true;
-      }
-    } catch (error) {
-      console.error('Auto-restore error:', error);
-    }
-    return false;
-  }, [setConfig, importLayers]);
-
-  /**
-   * Clears saved data from localStorage.
+   * Clears all saved data.
    */
   const clearSavedData = useCallback(() => {
     try {
-      localStorage.removeItem(LOCALSTORAGE_KEY);
-      localStorage.removeItem(LOCALSTORAGE_LAYERS_KEY);
-      setStatus('Saved data cleared', 'info');
+      localStorage.removeItem('heightmap-generator-state');
+      localStorage.removeItem('heightmap-generator-layers');
+      setStatus('All saved data cleared', 'info');
     } catch (error) {
       console.error('Clear error:', error);
     }
   }, [setStatus]);
 
-  // Setup auto-save interval
-  useEffect(() => {
-    autoSaveIntervalRef.current = window.setInterval(autoSave, AUTOSAVE_INTERVAL);
-    
-    // Also save on page unload
-    const handleBeforeUnload = () => {
-      autoSave();
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Save when visibility changes (tab/window switch)
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        autoSave();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (autoSaveIntervalRef.current) {
-        clearInterval(autoSaveIntervalRef.current);
-      }
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [autoSave]);
-
-  // Restore on mount
-  useEffect(() => {
-    const restored = autoRestore();
-    if (restored) {
-      setStatus('Config restored from last session', 'info');
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   return {
     saveProject,
     loadProject,
-    autoSave,
-    autoRestore,
     clearSavedData,
   };
 }

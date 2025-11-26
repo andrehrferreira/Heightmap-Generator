@@ -6,13 +6,6 @@ import { InfoPanel } from './components/InfoPanel';
 import { StatusBar } from './components/StatusBar';
 import { GeneratorProvider, useGenerator } from './context/GeneratorContext';
 import { LayerProvider, useLayerContext } from './context/LayerContext';
-import { useProject } from './hooks/useProject';
-
-// Component that initializes auto-save
-const ProjectInitializer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  useProject(); // This will setup auto-save and auto-restore
-  return <>{children}</>;
-};
 
 // Component that connects Generator to Layer system
 const LayerInitializer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -33,17 +26,15 @@ const App: React.FC = () => {
     <GeneratorProvider>
       <LayerProvider>
         <LayerInitializer>
-          <ProjectInitializer>
-            <div className="flex flex-col w-screen h-screen">
-              <MenuBar />
-              <main className="flex flex-1 overflow-hidden">
-                <Sidebar />
-                <Preview />
-                <InfoPanel />
-              </main>
-              <StatusBar />
-            </div>
-          </ProjectInitializer>
+          <div className="flex flex-col w-screen h-screen">
+            <MenuBar />
+            <main className="flex flex-1 overflow-hidden">
+              <Sidebar />
+              <Preview />
+              <InfoPanel />
+            </main>
+            <StatusBar />
+          </div>
         </LayerInitializer>
       </LayerProvider>
     </GeneratorProvider>
