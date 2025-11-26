@@ -215,6 +215,7 @@ export function unpackFlags(packed: number): Record<string, boolean> {
 export const KEYS = {
   CONFIG: 'config',
   VIEW_MODE: 'viewMode',
+  VIEW_OPTIONS: 'viewOptions',
   GRID_DATA: 'gridData',
   ROAD_NETWORK: 'roadNetwork',
   HEIGHT_STATS: 'heightStats',

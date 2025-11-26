@@ -216,21 +216,67 @@ function findRampBoundaries(
 }
 
 /**
- * Marks road cells on the grid.
+ * Simple noise function for road variation
+ */
+function roadNoise(x: number, y: number, seed: number): number {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+  return (n - Math.floor(n)) * 2 - 1; // -1 to 1
+}
+
+/**
+ * FBM noise for smoother road variation
+ */
+function roadFbmNoise(x: number, y: number, octaves: number, seed: number): number {
+  let value = 0;
+  let amplitude = 0.5;
+  let frequency = 1;
+  let maxValue = 0;
+  
+  for (let i = 0; i < octaves; i++) {
+    value += amplitude * roadNoise(x * frequency, y * frequency, seed + i * 100);
+    maxValue += amplitude;
+    amplitude *= 0.5;
+    frequency *= 2;
+  }
+  
+  return value / maxValue;
+}
+
+/**
+ * Marks road cells on the grid with noise for natural look.
+ * NOTE: Only marks flags, does NOT modify heightmap - roads are rendered as overlay
  */
 function markRoadCells(grid: Grid, path: Point[], roadId: number, roadWidth: number): void {
   const halfWidth = Math.floor(roadWidth / 2);
+  const noiseSeed = roadId * 12345;
+  const noiseScale = 0.1;
+  const noiseAmplitude = 2; // Pixels of offset
 
-  for (const point of path) {
-    // Expand road width
-    for (let dy = -halfWidth; dy <= halfWidth; dy++) {
-      for (let dx = -halfWidth; dx <= halfWidth; dx++) {
-        const x = point.x + dx;
-        const y = point.y + dy;
+  // Mark cells with noise offset - flags only, preserve heightmap
+  for (let i = 0; i < path.length; i++) {
+    const point = path[i];
+
+    // Add noise to the path position for organic look
+    const offsetX = roadFbmNoise(point.x * noiseScale, point.y * noiseScale, 3, noiseSeed) * noiseAmplitude;
+    const offsetY = roadFbmNoise(point.x * noiseScale + 100, point.y * noiseScale + 100, 3, noiseSeed) * noiseAmplitude;
+
+    // Expand road width with noise
+    const localWidth = halfWidth + Math.round(roadFbmNoise(i * 0.1, roadId, 2, noiseSeed) * 1);
+
+    for (let dy = -localWidth; dy <= localWidth; dy++) {
+      for (let dx = -localWidth; dx <= localWidth; dx++) {
+        const x = point.x + dx + Math.round(offsetX);
+        const y = point.y + dy + Math.round(offsetY);
 
         try {
           const cell = grid.getCell(x, y);
+          
+          // Skip barrier/blocked cells
+          if (cell.flags.visualOnly || cell.flags.blocked) continue;
+          
+          // Only set flags - DO NOT modify height
           cell.flags.road = true;
+          cell.flags.playable = true;
           cell.roadId = roadId;
         } catch {
           // Out of bounds, skip
@@ -239,6 +285,8 @@ function markRoadCells(grid: Grid, path: Point[], roadId: number, roadWidth: num
     }
   }
 }
+
+// smoothPathHeights removed - roads no longer modify heightmap
 
 /**
  * Marks ramp cells and applies progressive height interpolation.
@@ -272,27 +320,177 @@ function markRampCells(
 }
 
 /**
- * Generates random POIs for testing.
+ * Finds all exit points on the map borders.
+ */
+export function findExitPoints(grid: Grid): POINode[] {
+  const exits: POINode[] = [];
+  const cols = grid.getCols();
+  const rows = grid.getRows();
+  const borderWidth = 80; // Approximate border width
+  
+  // Scan borders for exit cells (cells marked as road near edges)
+  const edges = [
+    { startX: 0, startY: 0, endX: cols, endY: borderWidth, name: 'north' },
+    { startX: 0, startY: rows - borderWidth, endX: cols, endY: rows, name: 'south' },
+    { startX: 0, startY: 0, endX: borderWidth, endY: rows, name: 'west' },
+    { startX: cols - borderWidth, startY: 0, endX: cols, endY: rows, name: 'east' },
+  ];
+
+  for (const edge of edges) {
+    let exitCells: { x: number; y: number; height: number }[] = [];
+    
+    for (let y = edge.startY; y < edge.endY; y++) {
+      for (let x = edge.startX; x < edge.endX; x++) {
+        try {
+          const cell = grid.getCell(x, y);
+          // Exit cells are passable/road cells near borders with low height
+          if ((cell.flags.road || cell.flags.playable) && cell.height < 100) {
+            exitCells.push({ x, y, height: cell.height });
+          }
+        } catch {
+          // Out of bounds
+        }
+      }
+    }
+
+    // If we found exit cells, create a POI at the center of the cluster
+    if (exitCells.length > 0) {
+      // Find centroid
+      const avgX = Math.round(exitCells.reduce((s, c) => s + c.x, 0) / exitCells.length);
+      const avgY = Math.round(exitCells.reduce((s, c) => s + c.y, 0) / exitCells.length);
+      
+      // Clamp to valid coordinates
+      const x = Math.max(1, Math.min(cols - 2, avgX));
+      const y = Math.max(1, Math.min(rows - 2, avgY));
+      
+      const levelId = grid.getCell(x, y).levelId;
+      exits.push(createPOI(x, y, levelId, 'exit', `exit-${edge.name}`));
+    }
+  }
+
+  return exits;
+}
+
+/**
+ * Finds ramp waypoints - points on ramps that roads should pass through.
+ */
+export function findRampWaypoints(grid: Grid): POINode[] {
+  const waypoints: POINode[] = [];
+  const cols = grid.getCols();
+  const rows = grid.getRows();
+  
+  // Group ramp cells by approximate location
+  const rampClusters: Map<string, { x: number; y: number; count: number }> = new Map();
+  const clusterSize = 50;
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      try {
+        const cell = grid.getCell(x, y);
+        if (cell.flags.ramp) {
+          const clusterKey = `${Math.floor(x / clusterSize)},${Math.floor(y / clusterSize)}`;
+          const existing = rampClusters.get(clusterKey);
+          if (existing) {
+            existing.x += x;
+            existing.y += y;
+            existing.count++;
+          } else {
+            rampClusters.set(clusterKey, { x, y, count: 1 });
+          }
+        }
+      } catch {
+        // Out of bounds
+      }
+    }
+  }
+
+  // Create waypoints at cluster centers
+  let waypointId = 0;
+  for (const cluster of rampClusters.values()) {
+    if (cluster.count > 10) { // Only significant ramp clusters
+      const x = Math.round(cluster.x / cluster.count);
+      const y = Math.round(cluster.y / cluster.count);
+      
+      try {
+        const levelId = grid.getCell(x, y).levelId;
+        waypoints.push(createPOI(x, y, levelId, 'portal', `ramp-waypoint-${waypointId++}`));
+      } catch {
+        // Out of bounds
+      }
+    }
+  }
+
+  return waypoints;
+}
+
+/**
+ * Generates POIs including mandatory exits and ramp waypoints.
  */
 export function generateRandomPOIs(
   grid: Grid,
   count: number,
-  types: POIType[] = ['town', 'dungeon', 'exit', 'portal']
+  types: POIType[] = ['town', 'dungeon', 'portal']
 ): POINode[] {
   const pois: POINode[] = [];
   const cols = grid.getCols();
   const rows = grid.getRows();
-  const margin = Math.floor(Math.min(cols, rows) * 0.1);
+  const margin = Math.floor(Math.min(cols, rows) * 0.15);
 
-  for (let i = 0; i < count; i++) {
-    const x = margin + Math.floor(Math.random() * (cols - 2 * margin));
-    const y = margin + Math.floor(Math.random() * (rows - 2 * margin));
-    const levelId = grid.getCell(x, y).levelId;
-    const type = types[Math.floor(Math.random() * types.length)];
+  // 1. Add mandatory exit POIs first
+  const exits = findExitPoints(grid);
+  pois.push(...exits);
+  console.log(`[Roads] Found ${exits.length} exit points`);
 
-    pois.push(createPOI(x, y, levelId, type, `POI-${i}`));
+  // 2. Add ramp waypoints
+  const rampWaypoints = findRampWaypoints(grid);
+  pois.push(...rampWaypoints);
+  console.log(`[Roads] Found ${rampWaypoints.length} ramp waypoints`);
+
+  // 3. Add random POIs
+  const remainingCount = Math.max(0, count - exits.length);
+  
+  for (let i = 0; i < remainingCount; i++) {
+    // Try to place POI in valid location
+    let attempts = 0;
+    while (attempts < 20) {
+      const x = margin + Math.floor(Math.random() * (cols - 2 * margin));
+      const y = margin + Math.floor(Math.random() * (rows - 2 * margin));
+      
+      try {
+        const cell = grid.getCell(x, y);
+        
+        // Skip blocked/water/barrier cells
+        if (cell.flags.blocked || cell.flags.water || cell.flags.visualOnly) {
+          attempts++;
+          continue;
+        }
+        
+        // Check minimum distance from existing POIs
+        const minDist = 50;
+        let tooClose = false;
+        for (const existing of pois) {
+          const dist = Math.sqrt((x - existing.x) ** 2 + (y - existing.y) ** 2);
+          if (dist < minDist) {
+            tooClose = true;
+            break;
+          }
+        }
+        
+        if (!tooClose) {
+          const levelId = cell.levelId;
+          const type = types[Math.floor(Math.random() * types.length)];
+          pois.push(createPOI(x, y, levelId, type, `POI-${i}`));
+          break;
+        }
+      } catch {
+        // Out of bounds
+      }
+      
+      attempts++;
+    }
   }
 
+  console.log(`[Roads] Total POIs: ${pois.length} (${exits.length} exits, ${rampWaypoints.length} ramps, ${pois.length - exits.length - rampWaypoints.length} random)`);
   return pois;
 }
 

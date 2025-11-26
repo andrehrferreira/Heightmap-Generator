@@ -33,9 +33,13 @@ export const PreviewLayers: React.FC = () => {
         
         let color: string;
         if (cell.flags.road) {
-          color = '#d29922';
+          color = '#ffa500'; // Bright orange for roads
+        } else if (cell.flags.ramp) {
+          color = '#ffff00'; // Yellow for ramps
         } else if (cell.flags.water) {
           color = '#39c5cf';
+        } else if (cell.flags.visualOnly) {
+          color = '#2d333b'; // Dark for barriers
         } else {
           const idx = Math.max(0, Math.min(cell.levelId, levelColors.length - 1));
           color = levelColors[idx];
@@ -51,15 +55,25 @@ export const PreviewLayers: React.FC = () => {
       }
     }
 
+    // Draw POIs with different colors per type
     if (result.roadNetwork?.pois) {
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#f85149';
-      ctx.lineWidth = 2;
+      const poiColors: Record<string, string> = {
+        'exit': '#00ff00',    // Green for exits
+        'town': '#ff3333',    // Red for towns
+        'dungeon': '#9933ff', // Purple for dungeons
+        'portal': '#00ffff',  // Cyan for portals/ramps
+      };
 
       for (const poi of result.roadNetwork.pois) {
         const px = poi.x * cellWidth + cellWidth / 2;
         const py = poi.y * cellHeight + cellHeight / 2;
-        const radius = Math.max(4, Math.min(cellWidth, cellHeight) * 2);
+        const isExit = poi.type === 'exit';
+        const radius = Math.max(isExit ? 6 : 4, Math.min(cellWidth, cellHeight) * (isExit ? 3 : 2));
+        const color = poiColors[poi.type] || '#ff3333';
+
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
 
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI * 2);

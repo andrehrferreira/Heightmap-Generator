@@ -18,6 +18,8 @@ interface LayerContextType {
   layerStack: LayerStack | null;
   /** Initialize layer stack with dimensions */
   initializeStack: (width: number, height: number) => void;
+  /** Create layers for terrain levels */
+  createLayersForLevels: (levelIds: number[], maxLevel?: number) => void;
   /** All layers in order */
   layers: Layer[];
   /** Currently selected layer ID */
@@ -82,6 +84,65 @@ export const LayerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setSelectedLayerId('base');
     triggerUpdate();
   }, [triggerUpdate]);
+
+  // Level colors for visualization
+  const levelColors: Record<number, string> = {
+    0: '#4a9f4a', // Green - lowlands
+    1: '#8b7355', // Brown - hills  
+    2: '#a0a0a0', // Gray - highlands
+    3: '#ffffff', // White - peaks
+    4: '#d4a574', // Sandy - plateaus
+  };
+
+  const levelNames: Record<number, string> = {
+    0: 'Lowlands',
+    1: 'Hills',
+    2: 'Highlands', 
+    3: 'Peaks',
+    4: 'Plateau',
+  };
+
+  const createLayersForLevels = useCallback((levelIds: number[], maxLevel: number = 4) => {
+    if (!layerStack) return;
+
+    // Find unique levels in the terrain
+    const uniqueLevels = new Set<number>();
+    for (const levelId of levelIds) {
+      if (levelId >= 0 && levelId <= maxLevel) {
+        uniqueLevels.add(levelId);
+      }
+    }
+
+    // Sort levels
+    const sortedLevels = Array.from(uniqueLevels).sort((a, b) => a - b);
+
+    // Remove existing level layers (keep base)
+    const existingLayers = layerStack.getLayers();
+    for (const layer of existingLayers) {
+      if (layer.id !== 'base' && layer.id.startsWith('level-')) {
+        layerStack.removeLayer(layer.id);
+      }
+    }
+
+    // Create layer for each level found in terrain
+    for (const level of sortedLevels) {
+      const layerId = `level-${level}`;
+      const existing = layerStack.getLayer(layerId);
+      
+      if (!existing) {
+        const name = levelNames[level] || `Level ${level}`;
+        const color = levelColors[level] || '#808080';
+        
+        const newLayer = layerStack.addLayer(layerId, name, 'height');
+        if (newLayer) {
+          layerStack.setLayerColor(layerId, color);
+        }
+      }
+    }
+
+    console.log(`[Layers] Created ${sortedLevels.length} level layers:`, sortedLevels);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
 
   const layers = useMemo(() => {
     if (!layerStack) return [];
@@ -217,6 +278,7 @@ export const LayerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     <LayerContext.Provider value={{
       layerStack,
       initializeStack,
+      createLayersForLevels,
       layers,
       selectedLayerId,
       selectLayer,

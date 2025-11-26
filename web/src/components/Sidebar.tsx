@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Grid3X3, Mountain, Monitor, MapPin, Fence, ChevronDown, ChevronRight, Leaf, Shield, Stamp, PanelLeftClose, PanelLeft, Settings, Layers, Route, Gauge } from 'lucide-react';
+import { Grid3X3, Mountain, Monitor, MapPin, Fence, ChevronDown, ChevronRight, Leaf, Shield, Stamp, PanelLeftClose, PanelLeft, Settings, Layers, Route, Gauge, Droplets, Brush, Waves } from 'lucide-react';
 import { useGenerator, BiomeType } from '../context/GeneratorContext';
 import { Slider } from './ui/slider';
 import { Accordion, AccordionItem } from './ui/accordion';
@@ -174,6 +174,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false, onToggle })
           <CollapsedSidebarItem icon={<MapPin className="w-4 h-4" />} label="POI & Roads" />
           <CollapsedSidebarItem icon={<Gauge className="w-4 h-4" />} label="Performance" />
           <CollapsedSidebarItem icon={<Route className="w-4 h-4" />} label="Ramps" />
+          <CollapsedSidebarItem icon={<Droplets className="w-4 h-4" />} label="Erosion" />
+          <CollapsedSidebarItem icon={<Brush className="w-4 h-4" />} label="Detail" />
           <CollapsedSidebarItem icon={<Stamp className="w-4 h-4" />} label="Stamps" />
         </div>
       )}
@@ -501,6 +503,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false, onToggle })
                 step={1}
                 onChange={(v) => setConfig({ roadWidth: v })}
               />
+              <ConfigSlider
+                label="Road Noise"
+                value={config.roads?.noiseAmplitude ?? 2}
+                min={0}
+                max={5}
+                step={0.5}
+                onChange={(v) => setConfig({ roads: { ...config.roads, noiseAmplitude: v } })}
+              />
+              <ConfigSlider
+                label="Road Smoothing"
+                value={config.roads?.smoothingPasses ?? 3}
+                min={0}
+                max={8}
+                step={1}
+                onChange={(v) => setConfig({ roads: { ...config.roads, smoothingPasses: v } })}
+              />
+              <ConfigSlider
+                label="Road Blur"
+                value={config.roads?.blurPasses ?? 2}
+                min={0}
+                max={5}
+                step={1}
+                onChange={(v) => setConfig({ roads: { ...config.roads, blurPasses: v } })}
+              />
             </AccordionItem>
 
             <AccordionItem 
@@ -668,6 +694,280 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false, onToggle })
                       />
                     </>
                   )}
+                </>
+              )}
+            </AccordionItem>
+
+            <AccordionItem 
+              id="noise"
+              title="Noise Settings" 
+              icon={<Waves className="w-4 h-4" />}
+            >
+              {config.noise && (
+                <>
+                  <ConfigSlider
+                    label="Noise Scale"
+                    value={Math.round(config.noise.noiseScale * 10000)}
+                    min={10}
+                    max={1000}
+                    step={10}
+                    onChange={(v) => setConfig({ 
+                      noise: { ...config.noise, noiseScale: v / 10000 } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Octaves"
+                    value={config.noise.octaves}
+                    min={1}
+                    max={12}
+                    step={1}
+                    onChange={(v) => setConfig({ 
+                      noise: { ...config.noise, octaves: v } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Persistence"
+                    value={Math.round(config.noise.persistence * 100)}
+                    min={10}
+                    max={100}
+                    step={5}
+                    onChange={(v) => setConfig({ 
+                      noise: { ...config.noise, persistence: v / 100 } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Lacunarity"
+                    value={Math.round(config.noise.lacunarity * 10)}
+                    min={15}
+                    max={30}
+                    step={1}
+                    onChange={(v) => setConfig({ 
+                      noise: { ...config.noise, lacunarity: v / 10 } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Ridge Strength"
+                    value={Math.round(config.noise.ridgeStrength * 100)}
+                    min={0}
+                    max={100}
+                    step={5}
+                    onChange={(v) => setConfig({ 
+                      noise: { ...config.noise, ridgeStrength: v / 100 } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Domain Warp Strength"
+                    value={Math.round(config.noise.warpStrength * 100)}
+                    min={0}
+                    max={100}
+                    step={5}
+                    onChange={(v) => setConfig({ 
+                      noise: { ...config.noise, warpStrength: v / 100 } 
+                    })}
+                  />
+                  
+                  {config.noise.billowStrength !== undefined && (
+                    <ConfigSlider
+                      label="Billow Strength"
+                      value={Math.round(config.noise.billowStrength * 100)}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onChange={(v) => setConfig({ 
+                        noise: { ...config.noise, billowStrength: v / 100 } 
+                      })}
+                    />
+                  )}
+                  
+                  {config.noise.voronoiStrength !== undefined && (
+                    <ConfigSlider
+                      label="Voronoi Strength"
+                      value={Math.round(config.noise.voronoiStrength * 100)}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onChange={(v) => setConfig({ 
+                        noise: { ...config.noise, voronoiStrength: v / 100 } 
+                      })}
+                    />
+                  )}
+                </>
+              )}
+            </AccordionItem>
+
+            <AccordionItem 
+              id="erosion"
+              title="Erosion" 
+              icon={<Droplets className="w-4 h-4" />}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={config.erosion.enabled}
+                    onChange={(e) => setConfig({ 
+                      erosion: { ...config.erosion, enabled: e.target.checked } 
+                    })}
+                    className="rounded"
+                  />
+                  Enable Erosion
+                </label>
+              </div>
+              
+              {config.erosion.enabled && (
+                <>
+                  <ConfigSlider
+                    label="Erosion Iterations"
+                    value={config.erosion.iterations}
+                    min={1}
+                    max={10}
+                    step={1}
+                    onChange={(v) => setConfig({ 
+                      erosion: { ...config.erosion, iterations: v } 
+                    })}
+                  />
+                  
+                  <div className="flex items-center justify-between mb-3 mt-3">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={config.erosion.hydraulicEnabled}
+                        onChange={(e) => setConfig({ 
+                          erosion: { ...config.erosion, hydraulicEnabled: e.target.checked } 
+                        })}
+                        className="rounded"
+                      />
+                      Hydraulic Erosion (Water)
+                    </label>
+                  </div>
+                  
+                  {config.erosion.hydraulicEnabled && (
+                    <>
+                      <ConfigSlider
+                        label="Erosion Rate"
+                        value={Math.round(config.erosion.hydraulicRate * 100)}
+                        min={0}
+                        max={100}
+                        step={5}
+                        onChange={(v) => setConfig({ 
+                          erosion: { ...config.erosion, hydraulicRate: v / 100 } 
+                        })}
+                      />
+                      
+                      <ConfigSlider
+                        label="Deposition Rate"
+                        value={Math.round(config.erosion.depositionRate * 100)}
+                        min={0}
+                        max={100}
+                        step={5}
+                        onChange={(v) => setConfig({ 
+                          erosion: { ...config.erosion, depositionRate: v / 100 } 
+                        })}
+                      />
+                    </>
+                  )}
+                  
+                  <div className="flex items-center justify-between mb-3 mt-3">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={config.erosion.thermalEnabled}
+                        onChange={(e) => setConfig({ 
+                          erosion: { ...config.erosion, thermalEnabled: e.target.checked } 
+                        })}
+                        className="rounded"
+                      />
+                      Thermal Erosion (Talus)
+                    </label>
+                  </div>
+                  
+                  {config.erosion.thermalEnabled && (
+                    <>
+                      <ConfigSlider
+                        label="Talus Angle"
+                        value={Math.round(config.erosion.thermalTalusAngle * 100)}
+                        min={1}
+                        max={10}
+                        step={1}
+                        onChange={(v) => setConfig({ 
+                          erosion: { ...config.erosion, thermalTalusAngle: v / 100 } 
+                        })}
+                      />
+                      
+                      <ConfigSlider
+                        label="Erosion Strength"
+                        value={Math.round(config.erosion.thermalStrength * 100)}
+                        min={10}
+                        max={100}
+                        step={5}
+                        onChange={(v) => setConfig({ 
+                          erosion: { ...config.erosion, thermalStrength: v / 100 } 
+                        })}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </AccordionItem>
+
+            <AccordionItem 
+              id="detail"
+              title="Detail Enhancement" 
+              icon={<Brush className="w-4 h-4" />}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={config.detail.enabled}
+                    onChange={(e) => setConfig({ 
+                      detail: { ...config.detail, enabled: e.target.checked } 
+                    })}
+                    className="rounded"
+                  />
+                  Enable Detail Overlay
+                </label>
+              </div>
+              
+              {config.detail.enabled && (
+                <>
+                  <ConfigSlider
+                    label="Macro Detail (Large)"
+                    value={Math.round(config.detail.macroStrength * 1000)}
+                    min={0}
+                    max={50}
+                    step={1}
+                    onChange={(v) => setConfig({ 
+                      detail: { ...config.detail, macroStrength: v / 1000 } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Meso Detail (Medium)"
+                    value={Math.round(config.detail.mesoStrength * 1000)}
+                    min={0}
+                    max={50}
+                    step={1}
+                    onChange={(v) => setConfig({ 
+                      detail: { ...config.detail, mesoStrength: v / 1000 } 
+                    })}
+                  />
+                  
+                  <ConfigSlider
+                    label="Micro Detail (Fine)"
+                    value={Math.round(config.detail.microStrength * 1000)}
+                    min={0}
+                    max={30}
+                    step={1}
+                    onChange={(v) => setConfig({ 
+                      detail: { ...config.detail, microStrength: v / 1000 } 
+                    })}
+                  />
                 </>
               )}
             </AccordionItem>

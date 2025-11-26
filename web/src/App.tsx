@@ -24,14 +24,25 @@ const loadSidebarState = () => {
 
 // Component that connects Generator to Layer system
 const LayerInitializer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { onGenerate, isGenerating } = useGenerator();
-  const { initializeStack } = useLayerContext();
+  const { onGenerate, isGenerating, result } = useGenerator();
+  const { initializeStack, createLayersForLevels } = useLayerContext();
 
   useEffect(() => {
     onGenerate((cols, rows) => {
       initializeStack(cols, rows);
     });
   }, [onGenerate, initializeStack]);
+
+  // Create level layers when result changes
+  useEffect(() => {
+    if (result?.grid) {
+      const levelIds: number[] = [];
+      result.grid.forEachCell((cell: any) => {
+        levelIds.push(cell.levelId);
+      });
+      createLayersForLevels(levelIds);
+    }
+  }, [result, createLayersForLevels]);
 
   return (
     <>

@@ -24,11 +24,13 @@ export interface AStarConfig {
   flatCost: number;
   /** Cost multiplier for curves (default: 2.0) */
   curveCost: number;
-  /** Cost multiplier for level changes without ramp (default: 1000.0) */
+  /** Cost multiplier for level changes without ramp (default: 5.0) */
   levelChangeCost: number;
-  /** Cost multiplier for cells with road flag (default: 0.5) */
+  /** Cost multiplier for cells with road flag (default: 0.3) */
   roadCost: number;
-  /** Cost multiplier for cells with water flag (default: 5.0) */
+  /** Cost multiplier for cells with ramp flag (default: 0.2) - prefer ramps! */
+  rampCost: number;
+  /** Cost multiplier for cells with water flag (default: 10.0) */
   waterCost: number;
   /** Cost multiplier for cells with blocked flag (default: Infinity) */
   blockedCost: number;
@@ -42,9 +44,10 @@ export interface AStarConfig {
 export const DEFAULT_ASTAR_CONFIG: AStarConfig = {
   flatCost: 1.0,
   curveCost: 2.0,
-  levelChangeCost: 1000.0,
-  roadCost: 0.5,
-  waterCost: 5.0,
+  levelChangeCost: 3.0, // Allow level changes
+  roadCost: 0.3,        // Prefer existing roads
+  rampCost: 0.2,        // Strongly prefer existing ramps
+  waterCost: 10.0,      // Avoid water
   blockedCost: Infinity,
   allowDiagonal: true,
 };
@@ -100,8 +103,8 @@ function calculateCellCost(
     const toCell = grid.getCell(toX, toY);
     const flags = toCell.flags;
 
-    // Blocked cells are not traversable
-    if (flags.blocked) {
+    // Blocked or visual-only cells are not traversable
+    if (flags.blocked || flags.visualOnly) {
       return { cost: config.blockedCost, traversable: false };
     }
 
@@ -110,29 +113,33 @@ function calculateCellCost(
     // Check for level change
     const fromCell = grid.getCell(fromX, fromY);
     if (fromCell.levelId !== toCell.levelId) {
-      // If there's a ramp, allow it (cost will be handled by ramp generation)
-      if (!flags.ramp) {
-        return { cost: config.levelChangeCost, traversable: false };
+      // If there's a ramp, use it (very low cost)
+      if (flags.ramp) {
+        cost *= config.rampCost;
+      } else {
+        // No ramp - higher cost but still traversable
+        cost += config.levelChangeCost;
       }
-      // Ramp is traversable but may have higher cost
-      cost *= 1.5;
     }
 
-    // Road cells have lower cost
-    if (flags.road) {
+    // Ramp cells have lowest cost (strongly prefer)
+    if (flags.ramp) {
+      cost *= config.rampCost;
+    }
+    // Road cells have low cost
+    else if (flags.road) {
       cost *= config.roadCost;
     }
 
-    // Water cells have higher cost
+    // Water cells have much higher cost
     if (flags.water) {
       cost *= config.waterCost;
     }
 
-    // Check for curves (direction change)
-    // This is a simplified check - in practice, you'd track previous direction
+    // Diagonal movement slightly more expensive
     const isDiagonal = fromX !== toX && fromY !== toY;
     if (isDiagonal) {
-      cost *= 1.2; // Slight penalty for diagonal
+      cost *= 1.2;
     }
 
     return { cost, traversable: true };
