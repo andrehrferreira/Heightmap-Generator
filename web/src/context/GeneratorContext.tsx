@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 
 // Types
 export interface GenerationConfig {
@@ -41,6 +41,8 @@ interface GeneratorContextType {
   setStatus: (message: string, type?: StatusType) => void;
   isGenerating: boolean;
   generate: () => Promise<void>;
+  /** Callback to register layer initialization */
+  onGenerate: (callback: (cols: number, rows: number) => void) => void;
 }
 
 const defaultConfig: GenerationConfig = {
@@ -68,6 +70,7 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [viewMode, setViewMode] = useState<ViewMode>('3d');
   const [status, setStatusState] = useState({ message: 'Ready', type: 'success' as StatusType });
   const [isGenerating, setIsGenerating] = useState(false);
+  const onGenerateCallbackRef = useRef<((cols: number, rows: number) => void) | null>(null);
 
   const setConfig = useCallback((partial: Partial<GenerationConfig>) => {
     setConfigState(prev => ({ ...prev, ...partial }));
@@ -75,6 +78,10 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const setStatus = useCallback((message: string, type: StatusType = 'info') => {
     setStatusState({ message, type });
+  }, []);
+
+  const onGenerate = useCallback((callback: (cols: number, rows: number) => void) => {
+    onGenerateCallbackRef.current = callback;
   }, []);
 
   const generate = useCallback(async () => {
@@ -137,6 +144,11 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
         },
       });
 
+      // Initialize layer stack with grid dimensions
+      if (onGenerateCallbackRef.current) {
+        onGenerateCallbackRef.current(grid.getCols(), grid.getRows());
+      }
+
       setStatus(`Generated ${grid.getCols()}×${grid.getRows()} grid with ${pois.length} POIs`, 'success');
     } catch (error) {
       console.error('Generation error:', error);
@@ -157,6 +169,7 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
       setStatus,
       isGenerating,
       generate,
+      onGenerate,
     }}>
       {children}
     </GeneratorContext.Provider>

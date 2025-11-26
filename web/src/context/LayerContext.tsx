@@ -1,92 +1,242 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Layer, createDefaultLayers, DEFAULT_COLORS } from '../components/LayerPanel';
+/**
+ * Layer Context - Global state management for layers
+ */
+
+import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react';
+import { 
+  LayerStack, 
+  Layer, 
+  LayerType, 
+  BlendMode,
+  setLayerHeightAt,
+  applyBrush,
+  createLayerStyle,
+} from '../../../src/core/index.js';
 
 interface LayerContextType {
+  /** Layer stack instance */
+  layerStack: LayerStack | null;
+  /** Initialize layer stack with dimensions */
+  initializeStack: (width: number, height: number) => void;
+  /** All layers in order */
   layers: Layer[];
-  activeLayerId: string | null;
-  setActiveLayer: (id: string) => void;
+  /** Currently selected layer ID */
+  selectedLayerId: string | null;
+  /** Select a layer */
+  selectLayer: (id: string) => void;
+  /** Add a new layer */
+  addLayer: (name: string, type: LayerType) => Layer | null;
+  /** Remove a layer */
+  removeLayer: (id: string) => boolean;
+  /** Move layer up */
+  moveLayerUp: (id: string) => void;
+  /** Move layer down */
+  moveLayerDown: (id: string) => void;
+  /** Toggle layer visibility */
   toggleVisibility: (id: string) => void;
+  /** Toggle layer lock */
   toggleLock: (id: string) => void;
-  deleteLayer: (id: string) => void;
-  addLayer: (name?: string) => void;
-  resetLayers: () => void;
-  getVisibleLayers: () => Layer[];
+  /** Set layer opacity */
+  setOpacity: (id: string, opacity: number) => void;
+  /** Set layer blend mode */
+  setBlendMode: (id: string, mode: BlendMode) => void;
+  /** Set layer color */
+  setColor: (id: string, color: string) => void;
+  /** Apply brush to selected layer */
+  applyBrushToLayer: (x: number, y: number, radius: number, height: number) => void;
+  /** Duplicate layer */
+  duplicateLayer: (id: string) => Layer | null;
+  /** Merge layer down */
+  mergeDown: (id: string) => boolean;
+  /** Flatten all layers */
+  flattenLayers: () => void;
+  /** Serialize stack to JSON */
+  exportLayers: () => object | null;
+  /** Load stack from JSON */
+  importLayers: (json: object) => void;
 }
 
 const LayerContext = createContext<LayerContextType | null>(null);
 
-export const useLayer = () => {
+export const useLayerContext = () => {
   const context = useContext(LayerContext);
   if (!context) {
-    throw new Error('useLayer must be used within LayerProvider');
+    throw new Error('useLayerContext must be used within LayerProvider');
   }
   return context;
 };
 
 export const LayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [layers, setLayers] = useState<Layer[]>(createDefaultLayers());
-  const [activeLayerId, setActiveLayerId] = useState<string | null>('levels');
+  const [layerStack, setLayerStack] = useState<LayerStack | null>(null);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
 
-  const setActiveLayer = useCallback((id: string) => {
-    setActiveLayerId(id);
+  // Force re-render when layers change
+  const triggerUpdate = useCallback(() => {
+    setUpdateTrigger(prev => prev + 1);
   }, []);
+
+  const initializeStack = useCallback((width: number, height: number) => {
+    const stack = new LayerStack({ width, height });
+    setLayerStack(stack);
+    setSelectedLayerId('base');
+    triggerUpdate();
+  }, [triggerUpdate]);
+
+  const layers = useMemo(() => {
+    if (!layerStack) return [];
+    return layerStack.getLayers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layerStack, updateTrigger]);
+
+  const selectLayer = useCallback((id: string) => {
+    setSelectedLayerId(id);
+  }, []);
+
+  const addLayer = useCallback((name: string, type: LayerType): Layer | null => {
+    if (!layerStack) return null;
+    const layer = layerStack.addLayer(null, name, type);
+    setSelectedLayerId(layer.id);
+    triggerUpdate();
+    return layer;
+  }, [layerStack, triggerUpdate]);
+
+  const removeLayer = useCallback((id: string): boolean => {
+    if (!layerStack) return false;
+    const result = layerStack.removeLayer(id);
+    if (result && selectedLayerId === id) {
+      setSelectedLayerId('base');
+    }
+    triggerUpdate();
+    return result;
+  }, [layerStack, selectedLayerId, triggerUpdate]);
+
+  const moveLayerUp = useCallback((id: string) => {
+    if (!layerStack) return;
+    layerStack.moveLayerUp(id);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
+
+  const moveLayerDown = useCallback((id: string) => {
+    if (!layerStack) return;
+    layerStack.moveLayerDown(id);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
 
   const toggleVisibility = useCallback((id: string) => {
-    setLayers(prev => prev.map(layer =>
-      layer.id === id ? { ...layer, visible: !layer.visible } : layer
-    ));
-  }, []);
+    if (!layerStack) return;
+    const layer = layerStack.getLayer(id);
+    if (layer) {
+      layerStack.setLayerVisibility(id, !layer.visibility.visible);
+      triggerUpdate();
+    }
+  }, [layerStack, triggerUpdate]);
 
   const toggleLock = useCallback((id: string) => {
-    setLayers(prev => prev.map(layer =>
-      layer.id === id ? { ...layer, locked: !layer.locked } : layer
-    ));
-  }, []);
-
-  const deleteLayer = useCallback((id: string) => {
-    setLayers(prev => prev.filter(layer => layer.id !== id));
-    if (activeLayerId === id) {
-      setActiveLayerId(null);
+    if (!layerStack) return;
+    const layer = layerStack.getLayer(id);
+    if (layer) {
+      layerStack.setLayerLocked(id, !layer.visibility.locked);
+      triggerUpdate();
     }
-  }, [activeLayerId]);
+  }, [layerStack, triggerUpdate]);
 
-  const addLayer = useCallback((name?: string) => {
-    const newId = `custom-${Date.now()}`;
-    const newLayer: Layer = {
-      id: newId,
-      name: name || `Custom Layer ${layers.filter(l => l.type === 'custom').length + 1}`,
-      type: 'custom',
-      visible: true,
-      locked: false,
-      color: DEFAULT_COLORS.custom,
-    };
-    setLayers(prev => [...prev, newLayer]);
-    setActiveLayerId(newId);
-  }, [layers]);
+  const setOpacity = useCallback((id: string, opacity: number) => {
+    if (!layerStack) return;
+    layerStack.setLayerOpacity(id, opacity);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
 
-  const resetLayers = useCallback(() => {
-    setLayers(createDefaultLayers());
-    setActiveLayerId('levels');
-  }, []);
+  const setBlendMode = useCallback((id: string, mode: BlendMode) => {
+    if (!layerStack) return;
+    layerStack.setLayerBlendMode(id, mode);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
 
-  const getVisibleLayers = useCallback(() => {
-    return layers.filter(layer => layer.visible);
-  }, [layers]);
+  const setColor = useCallback((id: string, color: string) => {
+    if (!layerStack) return;
+    layerStack.setLayerColor(id, color);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
+
+  const applyBrushToLayer = useCallback((x: number, y: number, radius: number, height: number) => {
+    if (!layerStack || !selectedLayerId) return;
+    const layer = layerStack.getLayer(selectedLayerId);
+    if (layer && layer.data && !layer.visibility.locked) {
+      applyBrush(layer, x, y, radius, height);
+      triggerUpdate();
+    }
+  }, [layerStack, selectedLayerId, triggerUpdate]);
+
+  const duplicateLayer = useCallback((id: string): Layer | null => {
+    if (!layerStack) return null;
+    const newLayer = layerStack.duplicateLayer(id);
+    if (newLayer) {
+      setSelectedLayerId(newLayer.id);
+      triggerUpdate();
+    }
+    return newLayer;
+  }, [layerStack, triggerUpdate]);
+
+  const mergeDown = useCallback((id: string): boolean => {
+    if (!layerStack) return false;
+    const result = layerStack.mergeDown(id);
+    if (result) {
+      triggerUpdate();
+    }
+    return result;
+  }, [layerStack, triggerUpdate]);
+
+  const flattenLayers = useCallback(() => {
+    if (!layerStack) return;
+    const flattened = layerStack.flatten();
+    setSelectedLayerId(flattened.id);
+    triggerUpdate();
+  }, [layerStack, triggerUpdate]);
+
+  const exportLayers = useCallback((): object | null => {
+    if (!layerStack) return null;
+    return layerStack.toJSON();
+  }, [layerStack]);
+
+  const importLayers = useCallback((json: object) => {
+    try {
+      const stack = LayerStack.fromJSON(json as ReturnType<LayerStack['toJSON']>);
+      setLayerStack(stack);
+      const layers = stack.getLayers();
+      if (layers.length > 0) {
+        setSelectedLayerId(layers[0].id);
+      }
+      triggerUpdate();
+    } catch (error) {
+      console.error('Failed to import layers:', error);
+    }
+  }, [triggerUpdate]);
 
   return (
     <LayerContext.Provider value={{
+      layerStack,
+      initializeStack,
       layers,
-      activeLayerId,
-      setActiveLayer,
+      selectedLayerId,
+      selectLayer,
+      addLayer,
+      removeLayer,
+      moveLayerUp,
+      moveLayerDown,
       toggleVisibility,
       toggleLock,
-      deleteLayer,
-      addLayer,
-      resetLayers,
-      getVisibleLayers,
+      setOpacity,
+      setBlendMode,
+      setColor,
+      applyBrushToLayer,
+      duplicateLayer,
+      mergeDown,
+      flattenLayers,
+      exportLayers,
+      importLayers,
     }}>
       {children}
     </LayerContext.Provider>
   );
 };
-

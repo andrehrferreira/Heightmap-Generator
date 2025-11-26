@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGenerator } from '../context/GeneratorContext';
-import { useLayer } from '../context/LayerContext';
+import { useLayerContext } from '../context/LayerContext';
 import { Card } from './ui/card';
 import { LayerPanel } from './LayerPanel';
 
@@ -70,15 +70,6 @@ const StatsPanel: React.FC = () => {
 
 export const InfoPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('stats');
-  const {
-    layers,
-    activeLayerId,
-    setActiveLayer,
-    toggleVisibility,
-    toggleLock,
-    deleteLayer,
-    addLayer,
-  } = useLayer();
 
   return (
     <aside className="flex flex-col w-60 bg-card border-l border-border shrink-0">
@@ -105,19 +96,7 @@ export const InfoPanel: React.FC = () => {
         </button>
       </div>
       
-      {activeTab === 'stats' ? (
-        <StatsPanel />
-      ) : (
-        <LayerPanel
-          layers={layers}
-          activeLayerId={activeLayerId}
-          onLayerSelect={setActiveLayer}
-          onLayerToggleVisibility={toggleVisibility}
-          onLayerToggleLock={toggleLock}
-          onLayerDelete={deleteLayer}
-          onLayerAdd={addLayer}
-        />
-      )}
+      {activeTab === 'stats' ? <StatsPanel /> : <LayerPanel />}
     </aside>
   );
 };
