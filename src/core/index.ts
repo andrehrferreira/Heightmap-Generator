@@ -7,4 +7,7 @@ export * from './cell.js';
 export * from './level.js';
 export * from './grid.js';
 export * from './slope.js';
+export * from './layer.js';
+export * from './layer-stack.js';
+export * from './stamp.js';
 

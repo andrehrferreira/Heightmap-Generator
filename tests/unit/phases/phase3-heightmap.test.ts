@@ -163,10 +163,13 @@ describe('Phase 3: Heightmap Generation', () => {
 
   describe('DEFAULT_HEIGHTMAP_CONFIG', () => {
     it('should have correct default values', () => {
-      expect(DEFAULT_HEIGHTMAP_CONFIG.noiseAmplitude).toBe(10);
-      expect(DEFAULT_HEIGHTMAP_CONFIG.noiseScale).toBe(0.02);
+      expect(DEFAULT_HEIGHTMAP_CONFIG.noiseAmplitude).toBe(15);
+      expect(DEFAULT_HEIGHTMAP_CONFIG.noiseScale).toBe(0.03);
       expect(DEFAULT_HEIGHTMAP_CONFIG.roadSmoothingIterations).toBe(2);
       expect(DEFAULT_HEIGHTMAP_CONFIG.roadSmoothingRadius).toBe(2);
+      expect(DEFAULT_HEIGHTMAP_CONFIG.levelSmoothingIterations).toBe(8);
+      expect(DEFAULT_HEIGHTMAP_CONFIG.levelBlendRadius).toBe(4);
+      expect(DEFAULT_HEIGHTMAP_CONFIG.intraLevelVariation).toBe(20);
     });
   });
 });
