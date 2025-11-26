@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useGenerator } from '../context/GeneratorContext';
 
-// Maximum vertices for real-time preview (performance limit)
-const MAX_PREVIEW_SEGMENTS = 512;
+// Maximum segments for real-time preview (balance quality vs performance)
+const MAX_PREVIEW_SEGMENTS = 256; // Higher = better quality but slower
 
 export const Preview3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,7 +180,8 @@ export const Preview3D: React.FC = () => {
     console.log(`Height range: ${minH} - ${maxH}`);
     
     const heightRange = maxH - minH || 1;
-    const heightScale = 50; // Maximum height in 3D units
+    // Scale height proportionally to terrain size for natural look
+    const heightScale = terrainSize * 0.25; // 25% of terrain width as max height
 
     // Level colors
     const levelColors = [

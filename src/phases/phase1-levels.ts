@@ -26,10 +26,10 @@ export interface LevelDistributionConfig {
  * Default level distribution configuration.
  */
 export const DEFAULT_LEVEL_CONFIG: LevelDistributionConfig = {
-  minLevel: -1,
-  maxLevel: 3,
+  minLevel: 0,
+  maxLevel: 2,
   maxWalkableLevel: 2,
-  noiseScale: 0.05,
+  noiseScale: 0.015, // Lower scale = larger, smoother regions
 };
 
 /**

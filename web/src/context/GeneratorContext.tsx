@@ -46,8 +46,8 @@ interface GeneratorContextType {
 const defaultConfig: GenerationConfig = {
   width: 512,
   height: 512,
-  cellSize: 4,
-  levels: 3,
+  cellSize: 2,  // Smaller cells = more resolution
+  levels: 2,    // Fewer levels = smoother terrain
   poiCount: 5,
   roadWidth: 3,
 };

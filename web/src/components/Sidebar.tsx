@@ -130,10 +130,13 @@ export const Sidebar: React.FC = () => {
             label="Cell Size"
             value={config.cellSize}
             min={1}
-            max={16}
+            max={8}
             step={1}
             onChange={(v) => setConfig({ cellSize: v })}
           />
+          <div className="text-[10px] text-muted-foreground text-center -mt-1">
+            Grid: {Math.floor(config.width / config.cellSize)}×{Math.floor(config.height / config.cellSize)} cells
+          </div>
         </ConfigSection>
 
         <ConfigSection icon={<Mountain className="w-4 h-4" />} title="Terrain">
