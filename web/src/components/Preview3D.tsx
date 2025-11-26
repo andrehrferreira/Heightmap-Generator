@@ -27,7 +27,7 @@ export const Preview3D: React.FC = () => {
       0.1,
       10000
     );
-    camera.position.set(300, 400, 300);
+    camera.position.set(200, 300, 200);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -116,6 +116,24 @@ export const Preview3D: React.FC = () => {
     const segmentsX = Math.min(cols - 1, 256);
     const segmentsY = Math.min(rows - 1, 256);
 
+    // Find height range for normalization
+    let minHeight = Infinity;
+    let maxHeight = -Infinity;
+    
+    for (let i = 0; i <= segmentsY; i++) {
+      for (let j = 0; j <= segmentsX; j++) {
+        const x = Math.floor((j / segmentsX) * (cols - 1));
+        const y = Math.floor((i / segmentsY) * (rows - 1));
+        const cell = grid.getCell(x, y);
+        minHeight = Math.min(minHeight, cell.height);
+        maxHeight = Math.max(maxHeight, cell.height);
+      }
+    }
+    
+    const heightRange = maxHeight - minHeight || 1;
+    // Make height very prominent - use terrain size as scale
+    const heightScale = Math.max(cols, rows) * 0.8;
+
     for (let i = 0; i <= segmentsY; i++) {
       for (let j = 0; j <= segmentsX; j++) {
         const x = Math.floor((j / segmentsX) * (cols - 1));
@@ -123,7 +141,9 @@ export const Preview3D: React.FC = () => {
         const cell = grid.getCell(x, y);
         
         const index = i * (segmentsX + 1) + j;
-        const height = cell.height / 10;
+        // Normalize height to 0-1 range then scale
+        const normalizedHeight = (cell.height - minHeight) / heightRange;
+        const height = normalizedHeight * heightScale;
         positions.setY(index, height);
 
         let r = 0.2, g = 0.3, b = 0.2;
@@ -167,9 +187,10 @@ export const Preview3D: React.FC = () => {
       for (const poi of result.roadNetwork.pois) {
         const poiMesh = new THREE.Mesh(poiGeometry, poiMaterial);
         const cell = grid.getCell(poi.x, poi.y);
+        const normalizedPoiHeight = (cell.height - minHeight) / heightRange;
         poiMesh.position.set(
           poi.x - cols / 2,
-          cell.height / 10 + 5,
+          normalizedPoiHeight * heightScale + 5,
           poi.y - rows / 2
         );
         scene.add(poiMesh);
