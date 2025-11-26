@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useGenerator, GenerationConfig } from '../context/GeneratorContext';
+import { useLayerContext } from '../context/LayerContext';
 
 /**
  * Project file structure.
@@ -28,10 +29,12 @@ export interface ProjectFile {
     levelId: number;
     type: string;
   }>;
+  layers?: object;
 }
 
 const PROJECT_VERSION = '0.1.0';
 const LOCALSTORAGE_KEY = 'heightmap-generator-project';
+const LOCALSTORAGE_LAYERS_KEY = 'heightmap-generator-layers';
 const AUTOSAVE_INTERVAL = 30000; // 30 seconds
 
 /**
@@ -39,7 +42,9 @@ const AUTOSAVE_INTERVAL = 30000; // 30 seconds
  */
 export function useProject() {
   const { config, result, setConfig, setStatus } = useGenerator();
+  const { layerStack, exportLayers, importLayers } = useLayerContext();
   const autoSaveIntervalRef = useRef<number | null>(null);
+  const lastSaveRef = useRef<number>(0);
 
   /**
    * Saves project to a JSON file.
@@ -91,6 +96,12 @@ export function useProject() {
         }));
       }
 
+      // Add layers if available
+      const layersData = exportLayers();
+      if (layersData) {
+        project.layers = layersData;
+      }
+
       // Create download
       const blob = new Blob([JSON.stringify(project, null, 2)], {
         type: 'application/json',
@@ -107,7 +118,7 @@ export function useProject() {
       console.error('Save error:', error);
       setStatus('Failed to save project', 'error');
     }
-  }, [config, result, setStatus]);
+  }, [config, result, exportLayers, setStatus]);
 
   /**
    * Loads project from a JSON file.
@@ -131,6 +142,12 @@ export function useProject() {
 
         // Apply config
         setConfig(project.config);
+
+        // Import layers if available
+        if (project.layers) {
+          importLayers(project.layers);
+        }
+
         setStatus('Project loaded - click Generate to apply', 'success');
       } catch (error) {
         console.error('Load error:', error);
@@ -138,23 +155,39 @@ export function useProject() {
       }
     };
     input.click();
-  }, [setConfig, setStatus]);
+  }, [setConfig, importLayers, setStatus]);
 
   /**
    * Auto-saves to localStorage.
    */
   const autoSave = useCallback(() => {
+    const now = Date.now();
+    
+    // Debounce - don't save more than once per second
+    if (now - lastSaveRef.current < 1000) return;
+    lastSaveRef.current = now;
+
     try {
+      // Save config
       const project: ProjectFile = {
         version: PROJECT_VERSION,
         config,
         timestamp: new Date().toISOString(),
       };
       localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(project));
+
+      // Save layers separately (can be large)
+      const layersData = exportLayers();
+      if (layersData) {
+        localStorage.setItem(LOCALSTORAGE_LAYERS_KEY, JSON.stringify(layersData));
+      }
+
+      console.log('[AutoSave] Saved to localStorage');
     } catch (error) {
-      console.error('Auto-save error:', error);
+      // localStorage might be full or unavailable
+      console.warn('Auto-save error:', error);
     }
-  }, [config]);
+  }, [config, exportLayers]);
 
   /**
    * Restores from localStorage.
@@ -165,13 +198,33 @@ export function useProject() {
       if (saved) {
         const project: ProjectFile = JSON.parse(saved);
         setConfig(project.config);
+
+        // Restore layers if available
+        const savedLayers = localStorage.getItem(LOCALSTORAGE_LAYERS_KEY);
+        if (savedLayers) {
+          importLayers(JSON.parse(savedLayers));
+        }
+
         return true;
       }
     } catch (error) {
       console.error('Auto-restore error:', error);
     }
     return false;
-  }, [setConfig]);
+  }, [setConfig, importLayers]);
+
+  /**
+   * Clears saved data from localStorage.
+   */
+  const clearSavedData = useCallback(() => {
+    try {
+      localStorage.removeItem(LOCALSTORAGE_KEY);
+      localStorage.removeItem(LOCALSTORAGE_LAYERS_KEY);
+      setStatus('Saved data cleared', 'info');
+    } catch (error) {
+      console.error('Clear error:', error);
+    }
+  }, [setStatus]);
 
   // Setup auto-save interval
   useEffect(() => {
@@ -183,11 +236,20 @@ export function useProject() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    // Save when visibility changes (tab/window switch)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        autoSave();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (autoSaveIntervalRef.current) {
         clearInterval(autoSaveIntervalRef.current);
       }
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [autoSave]);
 
@@ -204,6 +266,6 @@ export function useProject() {
     loadProject,
     autoSave,
     autoRestore,
+    clearSavedData,
   };
 }
-
