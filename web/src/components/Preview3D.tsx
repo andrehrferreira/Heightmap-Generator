@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
-import { useGenerator } from '../context/GeneratorContext';
+import { useGenerator, calculateTerrainSize } from '../context/GeneratorContext';
 import { StandardTerrainRenderer } from '../lib/gpu/GPUTerrainRenderer';
 import { getNavMeshSystem } from '../lib/NavMeshGenerator';
 
@@ -208,13 +208,11 @@ export const Preview3D: React.FC = () => {
 
     updateSun();
 
-    // Create terrain renderer with massive open world scale
-    // terrainSize: size in world units (like meters)
-    // heightScale: vertical exaggeration for dramatic terrain
+    // Create terrain renderer - will be configured dynamically based on resolution
     terrainRendererRef.current = new StandardTerrainRenderer({
-      terrainSize: 16000,  // 16km x 16km terrain - massive open world
+      terrainSize: 16000,  // Initial size, updated based on config
       segments: MAX_PREVIEW_SEGMENTS,
-      heightScale: 800,    // Dramatic height for epic mountains
+      heightScale: 800,    // Initial height, updated based on config
     });
 
     // Handle resize
@@ -325,14 +323,24 @@ export const Preview3D: React.FC = () => {
     // Get height stats
     const heightStats = result.heightStats || { minHeight: 0, maxHeight: 100 };
 
-    // Create new terrain using optimized renderer
-    const terrainMesh = terrainRendererRef.current.createFromGrid(grid, heightStats);
-    scene.add(terrainMesh);
-
     const gridWidth = grid.getCols();
     const gridHeight = grid.getRows();
-    const terrainSize = 16000;   // Epic open world (16km)
-    const heightScale = 800;     // Epic height for mountains
+    
+    // Calculate terrain size based on resolution for proper scaling
+    const terrainSize = calculateTerrainSize(config.width, config.height);
+    const heightScale = config.heightScale;
+
+    // Recreate terrain renderer with updated config
+    terrainRendererRef.current.dispose();
+    terrainRendererRef.current = new StandardTerrainRenderer({
+      terrainSize,
+      segments: MAX_PREVIEW_SEGMENTS,
+      heightScale,
+    });
+
+    // Create new terrain using optimized renderer with proper config
+    const terrainMesh = terrainRendererRef.current.createFromGrid(grid, heightStats);
+    scene.add(terrainMesh);
 
     const heightRange = heightStats.maxHeight - heightStats.minHeight || 1;
 
@@ -549,8 +557,9 @@ export const Preview3D: React.FC = () => {
         const grid = result.grid;
         const cols = grid.getCols();
         const rows = grid.getRows();
-        const terrainSize = 16000;
-        const heightScale = 800;
+        // Use config values for terrain size and height scale
+        const terrainSize = calculateTerrainSize(config.width, config.height);
+        const heightScale = config.heightScale;
         const resolution = 16; // Sample every 16 cells
         
         // Get height range

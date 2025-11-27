@@ -15,6 +15,10 @@ export interface NavMeshConfig {
   stepHeight: number;
   /** Agent radius for path clearance */
   agentRadius: number;
+  /** Terrain size in world units (default calculated from resolution) */
+  terrainSize?: number;
+  /** Height scale for 3D visualization */
+  heightScale?: number;
 }
 
 export const DEFAULT_NAVMESH_CONFIG: NavMeshConfig = {
@@ -43,6 +47,8 @@ export class NavMeshSystem {
   private gridWidth: number = 0;
   private gridHeight: number = 0;
   private cellScale: number = 1;
+  private terrainSize: number = 16000;
+  private heightScale: number = 800;
 
   constructor() {
     this.pathfinding = new Pathfinding();
@@ -92,8 +98,11 @@ export class NavMeshSystem {
     // Generate triangle mesh from walkable cells
     const vertices: number[] = [];
     const indices: number[] = [];
-    const terrainSize = 16000; // Match Preview3D terrain size
-    const heightScale = 800;
+    // Use config values or calculate from resolution (base 1024 = 16000)
+    this.terrainSize = config.terrainSize ?? (Math.max(cols, rows) / 1024) * 16000;
+    this.heightScale = config.heightScale ?? 800;
+    const terrainSize = this.terrainSize;
+    const heightScale = this.heightScale;
 
     let minH = Infinity, maxH = -Infinity;
     for (let sy = 0; sy < sampledRows; sy++) {
@@ -239,8 +248,9 @@ export class NavMeshSystem {
       return null;
     }
 
-    const terrainSize = 16000;
-    const heightScale = 800;
+    // Use stored values from buildFromGrid
+    const terrainSize = this.terrainSize;
+    const heightScale = this.heightScale;
     
     // Get height stats
     let minH = Infinity, maxH = -Infinity;

@@ -8,6 +8,16 @@ import {
   KEYS
 } from '../lib/persistence';
 
+/**
+ * Calculate terrain size based on resolution.
+ * Base: 1024x1024 = 16000 (16km)
+ * Scales proportionally with resolution.
+ */
+export function calculateTerrainSize(width: number, height: number): number {
+  const maxDim = Math.max(width, height);
+  return (maxDim / 1024) * 16000;
+}
+
 // Biome types (must match src/core/biome.ts)
 export type BiomeType =
   | 'plains' | 'hills' | 'mountain' | 'desert' | 'canyon'
@@ -104,6 +114,8 @@ export interface GenerationConfig {
   seed: number;
   maxFPS: number; // Maximum FPS limit (default 30)
   useGPU: boolean; // Use GPU for terrain generation (default true)
+  // 3D Preview settings
+  heightScale: number; // Vertical scale for 3D preview (default 800)
 }
 
 export interface HeightStats {
@@ -246,6 +258,8 @@ const defaultConfig: GenerationConfig = {
   seed: 12345,
   maxFPS: 30,  // Default FPS limit
   useGPU: true, // Use GPU for faster terrain generation
+  // 3D Preview
+  heightScale: 800, // Vertical scale for 3D preview
 };
 
 // Grid data stored separately in IndexedDB (can be large)
@@ -901,9 +915,20 @@ export const GeneratorProvider: React.FC<{ children: ReactNode }> = ({ children 
       (prev.noise?.lacunarity !== config.noise?.lacunarity) ||
       (prev.noise?.ridgeStrength !== config.noise?.ridgeStrength) ||
       (prev.noise?.warpStrength !== config.noise?.warpStrength) ||
+      (prev.noise?.billowStrength !== config.noise?.billowStrength) ||
+      (prev.noise?.voronoiStrength !== config.noise?.voronoiStrength) ||
+      (prev.erosion?.enabled !== config.erosion?.enabled) ||
+      (prev.erosion?.iterations !== config.erosion?.iterations) ||
       (prev.erosion?.hydraulicEnabled !== config.erosion?.hydraulicEnabled) ||
       (prev.erosion?.hydraulicRate !== config.erosion?.hydraulicRate) ||
-      (prev.erosion?.depositionRate !== config.erosion?.depositionRate);
+      (prev.erosion?.depositionRate !== config.erosion?.depositionRate) ||
+      (prev.erosion?.thermalEnabled !== config.erosion?.thermalEnabled) ||
+      (prev.erosion?.thermalTalusAngle !== config.erosion?.thermalTalusAngle) ||
+      (prev.erosion?.thermalStrength !== config.erosion?.thermalStrength) ||
+      (prev.detail?.enabled !== config.detail?.enabled) ||
+      (prev.detail?.macroStrength !== config.detail?.macroStrength) ||
+      (prev.detail?.mesoStrength !== config.detail?.mesoStrength) ||
+      (prev.detail?.microStrength !== config.detail?.microStrength);
 
     if (!configChanged) {
       return;

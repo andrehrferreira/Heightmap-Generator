@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Grid3X3, Mountain, Monitor, MapPin, Fence, ChevronDown, ChevronRight, Leaf, Shield, Stamp, PanelLeftClose, PanelLeft, Settings, Layers, Route, Gauge, Droplets, Brush, Waves } from 'lucide-react';
-import { useGenerator, BiomeType } from '../context/GeneratorContext';
+import { Grid3X3, Mountain, Monitor, MapPin, Fence, ChevronDown, ChevronRight, Leaf, Shield, Stamp, PanelLeftClose, PanelLeft, Settings, Layers, Route, Gauge, Droplets, Brush, Waves, ArrowUpDown } from 'lucide-react';
+import { useGenerator, BiomeType, calculateTerrainSize } from '../context/GeneratorContext';
 import { Slider } from './ui/slider';
 import { Accordion, AccordionItem } from './ui/accordion';
 
@@ -245,8 +245,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false, onToggle })
                 step={1}
                 onChange={(v) => setConfig({ cellSize: v })}
               />
-              <div className="text-[10px] text-muted-foreground text-center -mt-1">
+              <div className="text-[10px] text-muted-foreground text-center -mt-1 mb-3">
                 Grid: {Math.floor(config.width / config.cellSize)}×{Math.floor(config.height / config.cellSize)} cells
+              </div>
+              <ConfigSlider
+                label="Height Scale"
+                value={config.heightScale}
+                min={100}
+                max={2000}
+                step={50}
+                onChange={(v) => setConfig({ heightScale: v })}
+              />
+              <div className="text-[10px] text-muted-foreground text-center -mt-1">
+                Terrain: {(calculateTerrainSize(config.width, config.height) / 1000).toFixed(1)}km × {(config.heightScale / 1000).toFixed(1)}km height
               </div>
             </AccordionItem>
 
