@@ -1,139 +1,143 @@
-# Terrain Generation Quality Specification
+# Terrain Detail Enhancement Specification (MMORPG-Safe)
 
-This specification defines the requirements for improving heightmap quality to match professional terrain generation tools.
+This specification defines requirements for adding visual detail to heightmaps while PRESERVING the core level/ramp system essential for MMORPG gameplay.
 
-## ADDED Requirements
+## CRITICAL: Preservation Requirements
 
-### Requirement: Continuous Height Gradient
-The system SHALL generate heightmaps with continuous gradient values instead of discrete stepped levels.
+### Requirement: Level System Integrity
+The system SHALL NOT modify the discrete level system or ramp transitions.
 
-#### Scenario: Smooth terrain transitions
-Given a terrain generation request
-When the heightmap is generated
-Then all height transitions SHALL be smooth without visible stepping artifacts
+#### Scenario: Level boundaries remain intact
+Given a generated heightmap with levels 0-3
+When detail enhancement is applied
+Then all level boundaries SHALL remain at their original positions
+And ramp slopes SHALL remain unchanged within 0.1% tolerance
 
-#### Scenario: Gradient blending
-Given two adjacent terrain regions with different base heights
-When the boundary is rendered
-Then the transition SHALL use smooth interpolation over at least 10% of the region width
-
----
-
-### Requirement: Advanced Noise Functions
-The system SHALL support multiple noise algorithms for realistic terrain generation.
-
-#### Scenario: Ridged multifractal noise
-Given terrain generation with mountain biome
-When ridged noise is enabled
-Then the system MUST apply ridged multifractal noise to create sharp ridge features
-
-#### Scenario: Billow noise for hills
-Given terrain generation with hills biome
-When billow noise is enabled
-Then the system MUST apply billow noise to create rounded hill formations
-
-#### Scenario: Voronoi noise for geological features
-Given terrain generation with any biome
-When Voronoi features are enabled
-Then the system SHALL apply Voronoi-based patterns for cracks, ridges, or plateaus
+#### Scenario: Ramp walkability preserved
+Given a ramp connecting level 1 to level 2
+When detail enhancement is applied
+Then the ramp surface angle SHALL NOT change by more than 0.5 degrees
+And the ramp SHALL remain fully walkable
 
 ---
 
-### Requirement: Domain Warping
-The system SHALL implement multi-pass domain warping for organic terrain shapes.
+## NEW Requirements (Safe Enhancements)
 
-#### Scenario: Cascade domain warping
-Given terrain generation with warping enabled
-When the noise is computed
-Then the system MUST apply at least 2 passes of domain warping for organic shapes
+### Requirement: Ramp Detection Mask
+The system SHALL generate a mask identifying ramp/transition zones where detail is NOT allowed.
 
-#### Scenario: Configurable warp strength
-Given terrain generation UI
-When the user adjusts warp strength
-Then the terrain SHALL reflect the updated warp intensity in real-time
+#### Scenario: Ramp zone detection
+Given a heightmap with level assignments
+When the ramp mask is generated
+Then all pixels within ramp transition zones SHALL be marked as "protected"
+And protection SHALL extend 5-10 pixels beyond visible ramp edges
 
----
-
-### Requirement: Hydraulic Erosion Simulation
-The system SHALL simulate water-based erosion to create realistic valleys and river channels.
-
-#### Scenario: Rain droplet simulation
-Given erosion is enabled with iteration count > 0
-When erosion is applied
-Then the system MUST simulate water droplets flowing downhill and eroding terrain
-
-#### Scenario: Sediment transport
-Given a water droplet moving across terrain
-When velocity exceeds sediment capacity
-Then the system MUST pick up sediment from the terrain surface
-
-#### Scenario: Sediment deposition
-Given a water droplet carrying sediment
-When velocity drops below deposition threshold
-Then the system MUST deposit sediment on the terrain surface
-
-#### Scenario: Valley formation
-Given multiple erosion iterations
-When erosion completes
-Then visible valley channels SHALL be formed in the terrain
+#### Scenario: Plateau center identification
+Given a pixel at least 20 pixels from any level boundary
+When the ramp mask is computed
+Then that pixel SHALL be marked as "safe for detail" with full intensity
 
 ---
 
-### Requirement: Thermal Erosion Simulation
-The system SHALL simulate thermal erosion to create realistic cliff faces and talus slopes.
+### Requirement: Level-Safe Micro-Detail
+The system SHALL add micro-detail ONLY in areas marked safe by the ramp mask.
 
-#### Scenario: Talus angle threshold
-Given terrain with slopes exceeding talus angle
-When thermal erosion is applied
-Then material SHALL collapse to redistribute height below the threshold angle
+#### Scenario: Detail application with mask
+Given a detail pass with ramp mask
+When micro-detail is applied
+Then protected (ramp) zones SHALL receive ZERO detail
+And safe (plateau) zones SHALL receive full detail intensity
+And transition zones SHALL receive proportionally reduced detail
 
-#### Scenario: Cliff formation
-Given repeated thermal erosion passes
-When steep terrain is processed
-Then the system MUST create natural-looking cliff formations
-
----
-
-### Requirement: Micro-Detail Overlay
-The system SHALL add fine-scale noise details to enhance terrain realism.
-
-#### Scenario: Multi-scale detail
+#### Scenario: Detail amplitude limits
 Given detail enhancement is enabled
-When terrain is generated
-Then the system MUST apply noise at macro (>100m), meso (10-100m), and micro (<10m) scales
-
-#### Scenario: Detail intensity control
-Given terrain generation UI
-When the user adjusts detail intensity
-Then the micro-detail strength SHALL change proportionally
+When detail is computed
+Then maximum detail amplitude SHALL NOT exceed 0.5% of level height difference
+And detail SHALL be purely cosmetic (no gameplay impact)
 
 ---
 
-### Requirement: Coastal Weathering
-The system SHALL simulate coastal erosion effects for island and coastal biomes.
+### Requirement: Multi-Scale Surface Detail
+The system SHALL support multiple detail scales for natural surface appearance.
 
-#### Scenario: Beach erosion
-Given island or coastal biome type
-When terrain is generated
-Then coastlines SHALL show natural erosion patterns with varied shoreline shapes
+#### Scenario: Three-scale detail system
+Given detail enhancement with default settings
+When applied to safe zones
+Then the system SHALL apply:
+- Macro detail (10-20 pixel features) at 0.1% amplitude
+- Meso detail (3-10 pixel features) at 0.2% amplitude
+- Micro detail (1-3 pixel features) at 0.2% amplitude
 
-#### Scenario: Underwater shelf
-Given coastal terrain
-When underwater areas are generated
-Then the system MUST create gradual underwater shelves before deep water
+#### Scenario: Scale-appropriate noise
+Given different detail scales
+When noise is generated
+Then each scale SHALL use appropriate noise frequency
+And all scales SHALL blend smoothly without artifacts
 
 ---
 
-### Requirement: Performance Optimization
-The system SHALL maintain acceptable performance during terrain generation.
+### Requirement: User Controls
+The system SHALL provide user controls for detail intensity.
 
-#### Scenario: GPU acceleration for erosion
-Given erosion simulation is enabled
-When processing large heightmaps (>1024x1024)
-Then erosion calculations MUST be performed on GPU using compute shaders
+#### Scenario: Detail intensity slider
+Given the terrain generation UI
+When user adjusts "Surface Detail" slider (0-100%)
+Then detail amplitude SHALL scale proportionally
+And 0% SHALL result in no detail (original clean levels)
 
-#### Scenario: Progressive quality
-Given user interaction during generation
-When quality preset is set to "preview"
-Then generation MUST complete within 2 seconds for 1024x1024 maps
+#### Scenario: Detail toggle
+Given the terrain generation UI
+When user toggles "Enable Surface Detail" off
+Then ALL detail passes SHALL be skipped
+And heightmap SHALL be identical to pre-detail state
 
+---
+
+### Requirement: Performance
+Detail enhancement SHALL NOT significantly impact generation time.
+
+#### Scenario: Performance target
+Given a 1024x1024 heightmap
+When detail enhancement is applied
+Then the additional processing time SHALL NOT exceed 50ms
+And total generation time SHALL remain under 500ms
+
+---
+
+## Implementation Notes
+
+### Pipeline Position
+Detail enhancement MUST run AFTER:
+1. Base heightmap generation
+2. Level assignment
+3. Border application
+4. **Ramp smoothing (12 passes)** ← Detail comes AFTER this
+
+### Shader: RAMP_MASK_FRAG (New)
+```glsl
+// Detect ramp zones by checking height gradient and level transitions
+// Output: 0.0 = protected (ramp), 1.0 = safe (plateau center)
+float detectRampZone(sampler2D heightmap, sampler2D levelmap, vec2 uv) {
+    // Check local height gradient
+    // Check level transitions in neighborhood
+    // Return protection factor
+}
+```
+
+### Shader: SAFE_DETAIL_FRAG (New)
+```glsl
+// Apply detail only where mask allows
+float applyMaskedDetail(float height, float mask, float detailNoise) {
+    float safeDetail = detailNoise * mask * detailIntensity;
+    return height + safeDetail;
+}
+```
+
+## Validation Criteria
+
+Before merging any detail enhancement:
+1. Run existing terrain generation tests
+2. Verify ramp angles unchanged (within 0.5 degrees)
+3. Verify level boundaries unchanged (within 1 pixel)
+4. Verify detail toggle OFF produces identical output to before
+5. Visual comparison: details should be subtle, not obvious
